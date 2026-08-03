@@ -1,1 +1,146 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<title>IzyAnalisaAI</title>
+
+<link rel="stylesheet" href="css/style.css">
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<script src="https://s3.tradingview.com/tv.js"></script>
+
+</head>
+
+<body>
+
+<div class="loading" id="loading">
+<div class="spinner"></div>
+<p>Loading Market...</p>
+</div>
+
+<header>
+
+<div class="logo">
+
+<h1>
+
+<span class="blue">Izy</span>
+
+<span class="white">Analisa</span>
+
+<span class="blue">AI</span>
+
+</h1>
+
+<p>Smart Indonesian Stock Intelligence</p>
+
+</div>
+
+<div class="menu">
+
+<button>Dashboard</button>
+
+<button>Scanner</button>
+
+<button>Analisa</button>
+
+<button>Watchlist</button>
+
+<button>Premium</button>
+
+</div>
+
+</header>
+
+<section class="hero">
+
+<div>
+
+<h2>
+
+Analisa Saham Indonesia
+
+dengan Artificial Intelligence
+
+</h2>
+
+<p>
+
+Temukan peluang trading berdasarkan
+
+AI Score,
+
+RSI,
+
+MACD,
+
+EMA,
+
+Volume,
+
+Support,
+
+Resistance,
+
+serta kondisi IHSG.
+
+</p>
+
+<button class="primary">
+
+Mulai Analisa
+
+</button>
+
+</div>
+
+<div id="tvchart"></div>
+
+</section>
+
+<section class="dashboard">
+
+<div class="box">
+
+<p>IHSG</p>
+
+<h2 id="ihsg">Loading...</h2>
+
+<span id="ihsgPersen">0%</span>
+
+</div>
+
+<div class="box">
+
+<p>Fear & Greed</p>
+
+<h2>68</h2>
+
+<span>Greedy</span>
+
+</div>
+
+<div class="box">
+
+<p>AI Confidence</p>
+
+<h2>84%</h2>
+
+<span>Bullish</span>
+
+</div>
+
+<div class="box">
+
+<p>Trading Plan</p>
+
+<h2>20:10 WIB</h2>
+
+<span>Ready</span>
+
+</div>
+
+</section>
