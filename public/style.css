@@ -183,3 +183,74 @@ footer { padding:30px 20px 130px; text-align:center; color:var(--text2); font-si
 .spinner { width:40px; height:40px; border:3px solid rgba(255,255,255,.05); border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 .loading p { color:var(--text2); font-size:14px; margin-top:12px; }
+/* ========================================= */
+/* TAMPILAN RESPONSIVE UNTUK HP (MOBILE)     */
+/* ========================================= */
+
+@media (max-width: 768px) {
+  /* Ubah menu header jadi tombol hamburger (☰) */
+  .menu {
+    display: none; /* Sembunyikan menu desktop */
+    flex-direction: column;
+    position: absolute;
+    top: 70px;
+    left: 0;
+    width: 100%;
+    background: #09101d;
+    padding: 20px;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+    gap: 10px;
+  }
+  .menu.open {
+    display: flex; /* Munculkan menu kalau tombol diklik */
+  }
+  .menu-toggle {
+    display: block; /* Munculkan tombol hamburger di HP */
+  }
+
+  /* Dashboard 2 kolom jadi rapi */
+  .dashboard {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 15px;
+  }
+
+  /* Chart disesuaikan ukurannya */
+  #tvchart {
+    height: 300px;
+  }
+
+  /* Hero text diperkecil */
+  .hero h2 {
+    font-size: 22px;
+  }
+  .hero p {
+    font-size: 14px;
+  }
+
+  /* Grid saham jadi 1 kolom di HP */
+  .stock-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Analisa grid jadi 2 kolom */
+  .analysis-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  /* Heatmap sektor jadi 2 kolom */
+  .heatmap {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .heat {
+    padding: 14px;
+    font-size: 14px;
+  }
+
+  /* Navbar bawah */
+  .bottom-nav a span {
+    font-size: 10px;
+  }
+}
