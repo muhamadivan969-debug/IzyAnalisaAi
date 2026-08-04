@@ -1,0 +1,18 @@
+{
+  "builds": [
+    {
+      "src": "pages/**/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "data/**/*.csv",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/pages/api/$1"
+    }
+  ]
+}
