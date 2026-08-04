@@ -1,3 +1,23 @@
+// =========================
+// HELPER: UPDATE CHART
+// =========================
+function updateChart(symbol) {
+  const container = document.getElementById("tvchart");
+  if (!container) return;
+
+  container.innerHTML = "";
+  window.tvWidget = new TradingView.widget({
+    autosize: true,
+    symbol: symbol,
+    interval: "D",
+    timezone: "Asia/Jakarta",
+    theme: "dark",
+    style: "1",
+    locale: "id",
+    container_id: "tvchart"
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
 
   const loading = document.getElementById("loading");
@@ -24,16 +44,8 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
-  window.tvWidget = new TradingView.widget({
-    autosize: true,
-    symbol: "IDX:BBRI",
-    interval: "D",
-    timezone: "Asia/Jakarta",
-    theme: "dark",
-    style: "1",
-    locale: "id",
-    container_id: "tvchart"
-  });
+  // Chart default = IHSG
+  updateChart("IDX:COMPOSITE");
 
   loadIHSG();
   loadMarketMovers();
@@ -162,17 +174,8 @@ async function analyzeStock() {
     const tp2 = Math.round(close * 1.06);
     const tp3 = Math.round(close * 1.09);
 
-    document.getElementById("tvchart").innerHTML = "";
-    window.tvWidget = new TradingView.widget({
-      autosize: true,
-      symbol: "IDX:" + kode,
-      interval: "D",
-      timezone: "Asia/Jakarta",
-      theme: "dark",
-      style: "1",
-      locale: "id",
-      container_id: "tvchart"
-    });
+    // Update chart otomatis ke saham yang dicari
+    updateChart("IDX:" + kode);
 
     document.getElementById("analysisCard").innerHTML = `
       <h2>${kode} <span class="badge ${signal === 'STRONG BUY' || signal === 'BUY' ? 'buy' : signal === 'SELL' ? 'sell' : 'hold'}">${signal}</span></h2>
@@ -205,12 +208,24 @@ async function analyzeStock() {
         Volume: ${volume.toLocaleString("id-ID")}
       </p>
 
+      <button id="backToIHSG" style="margin-top:12px;width:100%;background:#1b2644;border:1px solid rgba(255,255,255,.1);padding:10px;border-radius:10px;color:var(--text2);cursor:pointer;font-size:13px;">
+        ⬅️ Kembali ke Chart IHSG
+      </button>
+
       <p style="margin-top:15px;padding:12px;background:rgba(255,201,60,.1);border-radius:10px;color:var(--yellow);font-size:12px;text-align:center;">
         ⚠️ DYOR (Do Your Own Research) - Ini bukan saran finansial. Confidence Score menunjukkan keyakinan model, bukan jaminan hasil.
       </p>
     `;
 
     document.getElementById("analysisCard").scrollIntoView({ behavior: "smooth" });
+
+    const backBtn = document.getElementById("backToIHSG");
+    if (backBtn) {
+      backBtn.addEventListener("click", () => {
+        updateChart("IDX:COMPOSITE");
+        document.getElementById("tvchart").scrollIntoView({ behavior: "smooth" });
+      });
+    }
 
   } catch (err) {
     console.error(err);
@@ -313,7 +328,7 @@ function renderTopPick(data) {
 }
 
 // =========================
-// AI CHAT WIDGET
+// AI CHAT WIDGET (FULL SCREEN)
 // =========================
 function setupChatWidget() {
 
@@ -335,7 +350,6 @@ function setupChatWidget() {
     cursor: pointer;
     box-shadow: 0 8px 20px rgba(0,194,255,.4);
     z-index: 1000;
-    transition: .25s;
   `;
   document.body.appendChild(chatButton);
 
@@ -343,40 +357,82 @@ function setupChatWidget() {
   chatPanel.id = "chatPanel";
   chatPanel.style.cssText = `
     position: fixed;
-    bottom: 0;
-    right: 0;
+    top: 0;
+    left: 0;
     width: 100%;
-    max-width: 400px;
-    height: 70vh;
-    background: #151d33;
-    border-radius: 20px 20px 0 0;
-    box-shadow: 0 -10px 40px rgba(0,0,0,.5);
-    z-index: 1001;
+    height: 100%;
+    background: #05070d;
+    z-index: 2000;
     display: none;
     flex-direction: column;
-    overflow: hidden;
   `;
 
   chatPanel.innerHTML = `
-    <div style="padding:16px;background:#10192d;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.06);">
-      <strong style="color:#00C2FF;">🤖 AI Chat - IzyAnalisaAI</strong>
-      <span id="closeChatBtn" style="cursor:pointer;font-size:20px;color:#aeb7d1;">✕</span>
+    <div style="padding:18px 16px;background:#0a0e1a;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.08);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:22px;">🔴👁️</span>
+        <strong style="color:#00C2FF;font-size:17px;">IzyAI Analyst</strong>
+      </div>
+      <span id="closeChatBtn" style="cursor:pointer;font-size:24px;color:#aeb7d1;padding:5px;">✕</span>
     </div>
-    <div id="chatMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;">
-      <div style="background:#1b2644;padding:12px 15px;border-radius:14px;color:#aeb7d1;font-size:14px;">
-        Halo! Saya AI analis IzyAnalisaAI. Tanya apa saja soal saham atau IHSG, contoh: "Gimana arah IHSG besok?" atau "BBRI potensi naik ga?"
+
+    <div id="chatMessages" style="flex:1;overflow-y:auto;padding:20px 16px;display:flex;flex-direction:column;gap:16px;">
+      <div class="ai-msg">
+        Halo! Silakan tanya di IzyAnalisaAI kalau BBRI pas opening jelek banget, atau soal saham BEI dan arah IHSG lainnya.
+        <br><br>
+        Contoh: <i>"Gimana arah IHSG besok?"</i> atau <i>"BMRI potensi naik ga?"</i>
       </div>
     </div>
-    <div style="padding:14px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:10px;">
-      <input id="chatInput" type="text" placeholder="Tanya AI..." style="flex:1;background:#0f172a;border:none;padding:12px;border-radius:12px;color:white;outline:none;">
-      <button id="chatSendBtn" style="background:#00C2FF;border:none;padding:12px 18px;border-radius:12px;color:#081018;font-weight:700;cursor:pointer;">Kirim</button>
+
+    <div style="padding:14px 16px;border-top:1px solid rgba(255,255,255,.08);background:#0a0e1a;display:flex;gap:10px;align-items:center;">
+      <input id="chatInput" type="text" placeholder="Tanyakan apa saja..." style="flex:1;background:#151d33;border:none;padding:14px 16px;border-radius:24px;color:white;outline:none;font-size:15px;">
+      <button id="chatSendBtn" style="background:linear-gradient(135deg,#00C2FF,#00E5A8);border:none;width:44px;height:44px;border-radius:50%;color:#081018;font-weight:700;cursor:pointer;font-size:18px;flex-shrink:0;">↑</button>
     </div>
   `;
 
   document.body.appendChild(chatPanel);
 
+  const style = document.createElement("style");
+  style.textContent = `
+    .user-msg {
+      background: linear-gradient(135deg,#00C2FF,#0088CC);
+      color: #081018;
+      padding: 12px 16px;
+      border-radius: 18px 18px 4px 18px;
+      font-size: 14px;
+      align-self: flex-end;
+      max-width: 85%;
+      font-weight: 500;
+    }
+    .ai-msg {
+      background: #151d33;
+      color: #e5e9f5;
+      padding: 14px 16px;
+      border-radius: 18px 18px 18px 4px;
+      font-size: 14px;
+      line-height: 1.7;
+      align-self: flex-start;
+      max-width: 92%;
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    .ai-msg h2 {
+      font-size: 16px;
+      color: #00C2FF;
+      margin: 14px 0 8px;
+      font-weight: 700;
+    }
+    .ai-msg h2:first-child { margin-top: 0; }
+    .ai-msg strong { color: #fff; }
+    .ai-msg ul { padding-left: 18px; margin: 8px 0; }
+    .ai-msg li { margin-bottom: 6px; }
+    .ai-msg table { width:100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+    .ai-msg th, .ai-msg td { border: 1px solid rgba(255,255,255,.1); padding: 8px; text-align: left; }
+    .ai-msg th { background: #1b2644; }
+  `;
+  document.head.appendChild(style);
+
   chatButton.addEventListener("click", () => {
-    chatPanel.style.display = chatPanel.style.display === "none" ? "flex" : "none";
+    chatPanel.style.display = "flex";
   });
 
   document.getElementById("closeChatBtn").addEventListener("click", () => {
@@ -390,50 +446,86 @@ function setupChatWidget() {
 
     const messagesDiv = document.getElementById("chatMessages");
 
-    messagesDiv.innerHTML += `
-      <div style="background:#00C2FF;color:#081018;padding:12px 15px;border-radius:14px;font-size:14px;align-self:flex-end;max-width:80%;">
-        ${message}
-      </div>
-    `;
+    const userBubble = document.createElement("div");
+    userBubble.className = "user-msg";
+    userBubble.textContent = message;
+    messagesDiv.appendChild(userBubble);
 
     input.value = "";
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
-    const loadingId = "loading-" + Date.now();
-    messagesDiv.innerHTML += `
-      <div id="${loadingId}" style="background:#1b2644;padding:12px 15px;border-radius:14px;color:#aeb7d1;font-size:14px;">
-        Mengetik...
-      </div>
-    `;
+    const loadingBubble = document.createElement("div");
+    loadingBubble.className = "ai-msg";
+    loadingBubble.textContent = "Menganalisa data...";
+    messagesDiv.appendChild(loadingBubble);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+    const ihsgValue = document.getElementById("ihsg")?.textContent || "tidak tersedia";
+    const ihsgPersen = document.getElementById("ihsgPersen")?.textContent || "tidak tersedia";
+
+    let context = {
+      ihsg: ihsgValue,
+      ihsgPersen: ihsgPersen,
+      waktu: new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })
+    };
+
+    const kodeSahamMatch = message.toUpperCase().match(/\b[A-Z]{3,5}\b/g);
+    const kataUmum = ["IHSG", "BESOK", "HARI", "INI", "APA", "GIMANA", "BAGAIMANA", "KAPAN", "YANG", "DAN", "ATAU", "DARI", "UNTUK", "SAHAM", "MARKET", "NAIK", "TURUN"];
+    const kemungkinanSaham = kodeSahamMatch
+      ? kodeSahamMatch.filter(k => !kataUmum.includes(k))
+      : [];
+
+    if (kemungkinanSaham.length > 0) {
+      const kodeSaham = kemungkinanSaham[0];
+      loadingBubble.textContent = `Mengambil data ${kodeSaham}...`;
+
+      try {
+        const stockRes = await fetch(`/api/analyze?kode=${kodeSaham}`);
+        const stockJson = await stockRes.json();
+        const d = stockJson.data || stockJson;
+
+        if (d && Object.keys(d).length > 0) {
+          const close = Number(d.ClosePrice || d.LastPrice || d.close || 0);
+          const open = Number(d.OpenPrice || d.open || close);
+          const high = Number(d.HighPrice || d.high || close);
+          const low = Number(d.LowPrice || d.low || close);
+          const volume = Number(d.Volume || d.volume || 0);
+
+          if (close > 0) {
+            context.saham = {
+              kode: kodeSaham,
+              close: close,
+              open: open,
+              high: high,
+              low: low,
+              volume: volume,
+              perubahan: (((close - open) / open) * 100).toFixed(2) + "%"
+            };
+          }
+        }
+      } catch (err) {
+        console.error("Gagal fetch data saham untuk chat:", err);
+      }
+    }
+
+    loadingBubble.textContent = "Menganalisa...";
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message })
+        body: JSON.stringify({ message, context })
       });
 
       const json = await res.json();
       const reply = json.reply || "Maaf, terjadi kesalahan.";
 
-      document.getElementById(loadingId).remove();
-
-      messagesDiv.innerHTML += `
-        <div style="background:#1b2644;padding:12px 15px;border-radius:14px;color:white;font-size:14px;white-space:pre-wrap;">
-          ${reply}
-        </div>
-      `;
+      loadingBubble.innerHTML = typeof marked !== "undefined" ? marked.parse(reply) : reply;
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
     } catch (err) {
       console.error(err);
-      document.getElementById(loadingId).remove();
-      messagesDiv.innerHTML += `
-        <div style="background:#ff4d5a;padding:12px 15px;border-radius:14px;color:white;font-size:14px;">
-          Gagal menghubungi AI. Coba lagi nanti.
-        </div>
-      `;
+      loadingBubble.textContent = "Gagal menghubungi AI. Coba lagi nanti.";
     }
   };
 
