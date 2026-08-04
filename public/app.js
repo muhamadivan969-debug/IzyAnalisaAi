@@ -4,9 +4,6 @@
 let ihsgData = { value: null, changePercent: null };
 let companies = [];
 
-// ======================
-// HELPER: UPDATE CHART
-// ======================
 function updateChart(symbol) {
   const container = document.getElementById("tvchart");
   if (!container) return;
@@ -54,9 +51,6 @@ document.addEventListener("DOMContentLoaded", () => {
   loadCompanies().then(setupAutocomplete);
 });
 
-// ======================
-// ANALISA SAHAM UTAMA (Menggunakan API CSV lokal)
-// ======================
 async function analyzeStock(kodeOverride) {
   const inputEl = document.getElementById("stockInput");
   const kode = (kodeOverride || inputEl.value).toUpperCase().trim();
@@ -70,7 +64,6 @@ async function analyzeStock(kodeOverride) {
   btn.disabled = true;
 
   try {
-    // === PANGGIL API CSV KITA ===
     const res = await fetch(`/api/saham?kode=${kode}`);
     const json = await res.json();
 
@@ -91,7 +84,6 @@ async function analyzeStock(kodeOverride) {
     const low = d.low;
     const volume = d.volume;
 
-    // Logika AI Score
     let bullish = 50;
     let alasan = [];
     if (close > open) { bullish += 15; alasan.push("Harga close lebih tinggi dari open (momentum positif)"); }
@@ -136,7 +128,6 @@ async function analyzeStock(kodeOverride) {
       <p style="margin-top:15px;padding:12px;background:rgba(255,201,60,.1);border-radius:10px;color:var(--yellow);font-size:12px;text-align:center;">DYOR (Do Your Own Research) - Ini bukan saran finansial. Confidence Score menunjukkan keyakinan model, bukan jaminan profit.</p>
     `;
 
-    // Event listener tombol kembali
     document.getElementById("backToIHSG").addEventListener("click", () => {
       updateChart("IDX:COMPOSITE");
       document.getElementById("analysisCard").innerHTML = `<p style="text-align:center;padding:20px 0;opacity:.6;">Cari kode saham di atas untuk melihat hasil analisa AI di sini.</p>`;
@@ -151,9 +142,6 @@ async function analyzeStock(kodeOverride) {
   }
 }
 
-// ======================
-// FUNGSI LEVEL TRADING
-// ======================
 function hitungLevelTrading(open, high, low, close) {
   const support = low;
   const resistance = high;
@@ -176,9 +164,6 @@ function hitungLevelTrading(open, high, low, close) {
   };
 }
 
-// ======================
-// LOAD IHSG (Tetap pakai GoAPI / API eksternal lain)
-// ======================
 async function loadIHSG() {
   try {
     const res = await fetch('/api/analyze?kode=COMPOSITE'); 
@@ -198,9 +183,6 @@ async function loadIHSG() {
   } catch (err) { console.error("Gagal load IHSG:", err); }
 }
 
-// ======================
-// LOAD MARKET MOVERS (Top Gainers & Top Losers)
-// ======================
 async function loadMarketMovers() {
   try {
     const res = await fetch('/api/summary');
@@ -209,7 +191,6 @@ async function loadMarketMovers() {
     
     if (data.length === 0) return;
 
-    // Sortir berdasarkan perubahan persen terbesar
     const gainers = [...data].sort((a, b) => b.changePercent - a.changePercent).slice(0, 5);
     const losers = [...data].sort((a, b) => a.changePercent - b.changePercent).slice(0, 5);
 
@@ -220,7 +201,6 @@ async function loadMarketMovers() {
   }
 }
 
-// Fungsi render HTML untuk Gainers & Losers
 function renderGainersLosers(gainers, losers) {
   const marketGrid = document.querySelector(".market-grid");
   if (!marketGrid) return;
@@ -251,9 +231,7 @@ function renderGainersLosers(gainers, losers) {
   `;
 }
 
-// Fungsi render HTML untuk Top Pick
 function renderTopPick(data) {
-  // Beri skor AI sederhana
   const withScore = data.map(item => {
     let bullish = 50;
     if (item.close > item.open) bullish += 15;
@@ -268,7 +246,6 @@ function renderTopPick(data) {
     return { ...item, bullish, signal };
   });
 
-  // Ambil 3 saham dengan skor tertinggi
   const topPicks = [...withScore].sort((a, b) => b.bullish - a.bullish).slice(0, 3);
   
   const stockGrid = document.querySelector(".stock-grid");
@@ -288,7 +265,6 @@ function renderTopPick(data) {
     </div>
   `).join("");
 
-  // Event listener klik top pick
   stockGrid.querySelectorAll(".stock-card").forEach(card => {
     card.addEventListener("click", () => {
       const kode = card.getAttribute("data-kode");
@@ -299,11 +275,7 @@ function renderTopPick(data) {
   });
 }
 
-// ======================
-// LOAD COMPANIES (Daftar Emiten)
-// ======================
 async function loadCompanies() {
-  // Dummy data untuk autocomplete sementara
   companies = [
     { symbol: "BBRI", name: "Bank Rakyat Indonesia" },
     { symbol: "BMRI", name: "Bank Mandiri" },
@@ -316,9 +288,6 @@ async function loadCompanies() {
   ];
 }
 
-// ======================
-// AUTOCOMPLETE
-// ======================
 function setupAutocomplete() {
   const input = document.getElementById("stockInput");
   if (!input) return;
@@ -360,9 +329,6 @@ function setupAutocomplete() {
   });
 }
 
-// ======================
-// NAVIGASI & UI LAINNYA
-// ======================
 function setupNavigation() {
   document.querySelectorAll(".menu button[data-target], .bottom-nav a[data-target]").forEach(el => {
     el.addEventListener("click", (e) => {
@@ -413,21 +379,13 @@ function setupProfilMenu() {
 }
 
 function setupHeatmap() {
-  const heatmapEl = document.querySelector(".heatmap");
-  if (!heatmapEl) return;
-  const overlay = document.createElement("div");
-  overlay.className = "sector-modal-overlay";
-  overlay.id = "sectorModalOverlay";
-  // ... (kode modal heatmap sama persis seperti di app.pdf asli)
+  // Placeholder heatmap
 }
 
 function setupPremiumModal() {
-  const overlay = document.createElement("div");
-  overlay.className = "premium-modal-overlay";
-  overlay.id = "premiumModalOverlay";
-  // ... (kode modal premium sama persis seperti di app.pdf asli)
+  // Placeholder premium modal
 }
 
 function setupChatWidget() {
-  // ... (kode chat widget sama persis seperti di app.pdf asli)
+  // Placeholder chat widget
 }
