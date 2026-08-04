@@ -12,6 +12,14 @@ export default async function handler(req, res) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
 
+    if (!apiKey) {
+      console.error("GEMINI_API_KEY tidak ditemukan di environment variables");
+      return res.status(500).json({
+        error: "Server error",
+        reply: "Maaf, layanan AI belum dikonfigurasi dengan benar. Silakan hubungi admin."
+      });
+    }
+
     let dataSection = "";
     if (context) {
       dataSection = "\n=== DATA REAL-TIME (SUMBER RESMI, WAJIB DIGUNAKAN) ===\n";
@@ -40,34 +48,58 @@ ATURAN PENTING:
 7. Selalu akhiri dengan: "DYOR (Do Your Own Research) - ini bukan saran finansial."
 ${dataSection}`;
 
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-goog-api-key": apiKey
-        },
-        body: JSON.stringify({
-          contents: [
-            { parts: [{ text: systemPrompt + "\n\nPertanyaan user: " + message }] }
-          ]
-        })
-      }
-    );
+    // Model utama: alias "latest" otomatis mengarah ke versi Gemini Flash
+    // stabil terbaru, sehingga tidak perlu update manual saat Google
+    // pensiunkan versi lama (mis. gemini-2.0-flash sudah dimatikan 1 Jun 2026).
+    const MODEL_PRIMARY = "gemini-flash-latest";
+    const MODEL_FALLBACK = "gemini-2.5-flash";
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json({ error: "Gagal menghubungi Gemini API", detail: data });
+    async function callGemini(model) {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-goog-api-key": apiKey
+          },
+          body: JSON.stringify({
+            contents: [
+              { parts: [{ text: systemPrompt + "\n\nPertanyaan user: " + message }] }
+            ]
+          })
+        }
+      );
+      const data = await response.json();
+      return { ok: response.ok, status: response.status, data };
     }
 
-    const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf, AI tidak bisa memberikan jawaban saat ini.";
+    let result = await callGemini(MODEL_PRIMARY);
+
+    // Kalau model utama gagal (mis. nama model berubah lagi di kemudian hari),
+    // coba fallback sekali sebelum menyerah, supaya chat tidak langsung mati total.
+    if (!result.ok) {
+      console.error("Gemini primary model gagal:", result.status, JSON.stringify(result.data));
+      result = await callGemini(MODEL_FALLBACK);
+    }
+
+    if (!result.ok) {
+      console.error("Gemini fallback model juga gagal:", result.status, JSON.stringify(result.data));
+      return res.status(200).json({
+        reply: "Maaf, AI sedang mengalami gangguan koneksi ke server. Coba tanya lagi beberapa saat lagi ya."
+      });
+    }
+
+    const aiReply = result.data.candidates?.[0]?.content?.parts?.[0]?.text
+      || "Maaf, AI tidak bisa memberikan jawaban untuk pertanyaan ini. Coba tanyakan dengan cara lain.";
 
     return res.status(200).json({ reply: aiReply });
 
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Server error", detail: err.message });
+    console.error("Chat handler error:", err);
+    return res.status(500).json({
+      error: "Server error",
+      reply: "Maaf, terjadi kendala teknis saat menghubungi AI. Silakan coba lagi."
+    });
   }
 }
