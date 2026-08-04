@@ -24,7 +24,20 @@ function updateChart(symbol) {
     theme: "dark",
     style: "1",
     locale: "id",
-    container_id: "tvchart"
+    container_id: "tvchart",
+    // Batasi simbol yang muncul di search box (tombol "+") supaya
+    // hanya menampilkan saham Bursa Efek Indonesia (IDX), bukan
+    // crypto/forex/saham luar negeri.
+    symbol_search_request_delay: 300,
+    widgetbar: { details: false, news: false },
+    overrides: {},
+    disabled_features: [
+      "header_symbol_search"
+    ],
+    enabled_features: [],
+    // Filter market ke Indonesia Stock Exchange saja
+    exchanges: ["IDX"],
+    symbol_types: ["stock", "index"]
   });
 }
 
@@ -42,6 +55,58 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", analyzeStock);
   }
 
+  setupNavigation();
+  setupMobileMenu();
+  updateChart("IDX:COMPOSITE");
+
+  loadIHSG();
+  loadMarketMovers();
+  setupChatWidget();
+  setupHeatmap();
+  setupPremiumModal();
+  setupProfilMenu();
+  loadCompanies().then(setupAutocomplete);
+
+});
+
+// =========================
+// PROFIL MENU
+// =========================
+function setupProfilMenu() {
+  // Item dengan data-target -> scroll ke section terkait
+  document.querySelectorAll(".profil-menu-item[data-target]").forEach(el => {
+    el.addEventListener("click", () => {
+      const target = document.getElementById(el.getAttribute("data-target"));
+      if (target) target.scrollIntoView({ behavior: "smooth" });
+    });
+  });
+
+  const notif = document.getElementById("profilNotifikasi");
+  if (notif) {
+    notif.addEventListener("click", () => {
+      alert("Pengaturan notifikasi akan segera hadir.");
+    });
+  }
+
+  const bantuan = document.getElementById("profilBantuan");
+  if (bantuan) {
+    bantuan.addEventListener("click", () => {
+      alert("Butuh bantuan? Hubungi tim IzyAnalisaAI melalui chat AI di pojok kanan bawah.");
+    });
+  }
+
+  const tentang = document.getElementById("profilTentang");
+  if (tentang) {
+    tentang.addEventListener("click", () => {
+      alert("IzyAnalisaAI — Smart Indonesian Stock Intelligence.\nAnalisa saham BEI berbasis AI Score, RSI, MACD, EMA, Volume, Support & Resistance.");
+    });
+  }
+}
+
+// =========================
+// NAVIGASI (Desktop menu + Bottom nav)
+// =========================
+function setupNavigation() {
   document.querySelectorAll(".menu button[data-target], .bottom-nav a[data-target]")
     .forEach(el => {
       el.addEventListener("click", (e) => {
@@ -51,17 +116,39 @@ document.addEventListener("DOMContentLoaded", () => {
         if (target) {
           target.scrollIntoView({ behavior: "smooth" });
         }
+        // Tutup dropdown menu mobile setelah memilih menu
+        const menu = document.querySelector(".menu");
+        if (menu) menu.classList.remove("open");
       });
     });
+}
 
-  updateChart("IDX:COMPOSITE");
+// =========================
+// HAMBURGER MENU (mobile)
+// =========================
+function setupMobileMenu() {
+  const header = document.querySelector("header");
+  const menu = document.querySelector(".menu");
+  if (!header || !menu) return;
 
-  loadIHSG();
-  loadMarketMovers();
-  setupChatWidget();
-  loadCompanies().then(setupAutocomplete);
+  const toggleBtn = document.createElement("button");
+  toggleBtn.className = "menu-toggle";
+  toggleBtn.innerHTML = "☰";
+  toggleBtn.setAttribute("aria-label", "Buka menu");
+  header.insertBefore(toggleBtn, menu);
 
-});
+  toggleBtn.addEventListener("click", () => {
+    menu.classList.toggle("open");
+    toggleBtn.innerHTML = menu.classList.contains("open") ? "✕" : "☰";
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!menu.contains(e.target) && e.target !== toggleBtn && menu.classList.contains("open")) {
+      menu.classList.remove("open");
+      toggleBtn.innerHTML = "☰";
+    }
+  });
+}
 
 // =========================
 // FETCH IHSG
@@ -100,11 +187,58 @@ async function loadIHSG() {
 }
 
 // =========================
+// HITUNG SUPPORT / RESISTANCE & BUY AREA
+// =========================
+// Catatan penting: perhitungan ini memakai OHLC HARI INI (open/high/low/close)
+// karena itulah data yang tersedia dari API saat ini. Untuk akurasi lebih
+// tinggi, idealnya support/resistance dihitung dari data historis beberapa
+// hari/minggu terakhir (swing high-low), bukan cuma 1 hari. Jika sumber data
+// GoAPI menyediakan endpoint riwayat harga, ini bisa ditingkatkan lebih lanjut.
+function hitungLevelTrading(open, high, low, close) {
+  // Support = area terendah yang "wajar" (low hari ini, dengan sedikit buffer)
+  // Resistance = area tertinggi yang "wajar" (high hari ini)
+  const support = low;
+  const resistance = high;
+  const range = Math.max(resistance - support, close * 0.01); // hindari range 0
+
+  // Buy area WAJIB berada di ANTARA support dan close (bukan di atas resistance).
+  // Idealnya beli mendekati support, bukan mendekati/di atas resistance.
+  let buyLow = support + range * 0.1;
+  let buyHigh = support + range * 0.35;
+
+  // Jaga-jaga: buy area tidak boleh melebihi close hari ini (tidak logis
+  // menyarankan "buy" di atas harga penutupan sebagai area akumulasi awal)
+  if (buyHigh > close) buyHigh = close;
+  if (buyLow > buyHigh) buyLow = buyHigh * 0.995;
+
+  // Stop Loss: sedikit di bawah support, supaya ada ruang toleransi noise
+  const stopLoss = Math.round(support * 0.985);
+
+  // Take Profit bertingkat menuju resistance dan sedikit di atasnya
+  // (breakout target), berbasis range aktual, bukan persentase acak dari close.
+  const tp1 = Math.round(close + range * 0.5);
+  const tp2 = Math.round(resistance);
+  const tp3 = Math.round(resistance + range * 0.3);
+
+  return {
+    buy1: Math.round(buyLow),
+    buy2: Math.round(buyHigh),
+    stopLoss,
+    tp1,
+    tp2,
+    tp3,
+    support: Math.round(support),
+    resistance: Math.round(resistance)
+  };
+}
+
+// =========================
 // ANALISA SAHAM (SEARCH)
 // =========================
-async function analyzeStock() {
+async function analyzeStock(kodeOverride) {
 
-  const kode = document.getElementById("stockInput").value.toUpperCase().trim();
+  const inputEl = document.getElementById("stockInput");
+  const kode = (kodeOverride || inputEl.value).toUpperCase().trim();
 
   if (kode === "") {
     alert("Masukkan kode saham.");
@@ -179,12 +313,7 @@ async function analyzeStock() {
     else if (bullish >= 60) signal = "BUY";
     else if (bullish <= 35) signal = "SELL";
 
-    const buy1 = Math.round(close * 0.995);
-    const buy2 = Math.round(close * 1.005);
-    const sl = Math.round(close * 0.97);
-    const tp1 = Math.round(close * 1.03);
-    const tp2 = Math.round(close * 1.06);
-    const tp3 = Math.round(close * 1.09);
+    const lvl = hitungLevelTrading(open, high, low, close);
 
     updateChart("IDX:" + kode);
 
@@ -201,11 +330,13 @@ async function analyzeStock() {
       <hr>
 
       <div class="signal-grid">
-        <div><p>BUY AREA</p><h3>Rp ${buy1.toLocaleString("id-ID")} - Rp ${buy2.toLocaleString("id-ID")}</h3></div>
-        <div><p>STOP LOSS</p><h3>Rp ${sl.toLocaleString("id-ID")}</h3></div>
-        <div><p>TP1</p><h3>Rp ${tp1.toLocaleString("id-ID")}</h3></div>
-        <div><p>TP2</p><h3>Rp ${tp2.toLocaleString("id-ID")}</h3></div>
-        <div><p>TP3</p><h3>Rp ${tp3.toLocaleString("id-ID")}</h3></div>
+        <div><p>Support</p><h3>Rp ${lvl.support.toLocaleString("id-ID")}</h3></div>
+        <div><p>Resistance</p><h3>Rp ${lvl.resistance.toLocaleString("id-ID")}</h3></div>
+        <div><p>BUY AREA</p><h3>Rp ${lvl.buy1.toLocaleString("id-ID")} - Rp ${lvl.buy2.toLocaleString("id-ID")}</h3></div>
+        <div><p>STOP LOSS</p><h3 class="red">Rp ${lvl.stopLoss.toLocaleString("id-ID")}</h3></div>
+        <div><p>TP1</p><h3 class="green">Rp ${lvl.tp1.toLocaleString("id-ID")}</h3></div>
+        <div><p>TP2</p><h3 class="green">Rp ${lvl.tp2.toLocaleString("id-ID")}</h3></div>
+        <div><p>TP3</p><h3 class="green">Rp ${lvl.tp3.toLocaleString("id-ID")}</h3></div>
       </div>
 
       <div style="margin-top:18px;padding:15px;background:#10192d;border-radius:12px;">
@@ -224,7 +355,7 @@ async function analyzeStock() {
       </button>
 
       <p style="margin-top:15px;padding:12px;background:rgba(255,201,60,.1);border-radius:10px;color:var(--yellow);font-size:12px;text-align:center;">
-        ⚠️ DYOR (Do Your Own Research) - Ini bukan saran finansial. Confidence Score menunjukkan keyakinan model, bukan jaminan hasil.
+        ⚠️ DYOR (Do Your Own Research) - Ini bukan saran finansial. Confidence Score menunjukkan keyakinan model, bukan jaminan hasil. Support/Resistance dihitung dari data 1 hari terakhir.
       </p>
     `;
 
@@ -324,7 +455,7 @@ function renderTopPick(data) {
   if (!stockGrid) return;
 
   stockGrid.innerHTML = topPicks.map(item => `
-    <div class="stock-card">
+    <div class="stock-card" data-kode="${item.kode}">
       <div>
         <h3>${item.kode}</h3>
         <p>Saham BEI</p>
@@ -336,6 +467,16 @@ function renderTopPick(data) {
       <div class="score">AI Confidence <b>${item.bullish}%</b></div>
     </div>
   `).join("");
+
+  // Klik card top pick -> langsung analisa saham itu
+  stockGrid.querySelectorAll(".stock-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const kode = card.getAttribute("data-kode");
+      document.getElementById("stockInput").value = kode;
+      document.getElementById("searchSection").scrollIntoView({ behavior: "smooth" });
+      analyzeStock(kode);
+    });
+  });
 }
 
 // =========================
@@ -397,6 +538,156 @@ function setupAutocomplete() {
 
   document.addEventListener("click", (e) => {
     if (!box.contains(e.target) && e.target !== input) box.style.display = "none";
+  });
+}
+
+// =========================
+// HEATMAP SEKTOR (klik untuk lihat semua saham di sektor)
+// =========================
+function setupHeatmap() {
+  const heatmapEl = document.querySelector(".heatmap");
+  if (!heatmapEl) return;
+
+  // Bikin modal overlay sekali di awal
+  const overlay = document.createElement("div");
+  overlay.className = "sector-modal-overlay";
+  overlay.id = "sectorModalOverlay";
+  overlay.innerHTML = `
+    <div class="sector-modal">
+      <div class="sector-modal-header">
+        <h3 id="sectorModalTitle">Sektor</h3>
+        <span id="sectorModalClose">✕</span>
+      </div>
+      <div class="sector-modal-list" id="sectorModalList">
+        <p style="text-align:center;padding:20px;color:var(--text2);">Memuat data...</p>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.classList.remove("open");
+  });
+  document.getElementById("sectorModalClose").addEventListener("click", () => {
+    overlay.classList.remove("open");
+  });
+
+  // Setiap kotak sektor jadi bisa diklik
+  heatmapEl.querySelectorAll(".heat").forEach(el => {
+    el.style.cursor = "pointer";
+    el.addEventListener("click", () => openSectorModal(el.textContent.trim()));
+  });
+}
+
+async function openSectorModal(sectorName) {
+  const overlay = document.getElementById("sectorModalOverlay");
+  const title = document.getElementById("sectorModalTitle");
+  const list = document.getElementById("sectorModalList");
+
+  title.textContent = `🌡️ Sektor ${sectorName}`;
+  list.innerHTML = `<p style="text-align:center;padding:20px;color:var(--text2);">Memuat data saham ${sectorName}...</p>`;
+  overlay.classList.add("open");
+
+  try {
+    const res = await fetch(`/api/sector?name=${encodeURIComponent(sectorName)}`);
+    const json = await res.json();
+    const data = json.data || [];
+
+    if (data.length === 0) {
+      list.innerHTML = `<p style="text-align:center;padding:20px;color:var(--text2);">Data saham untuk sektor ini belum tersedia.</p>`;
+      return;
+    }
+
+    list.innerHTML = data.map(item => `
+      <div class="sector-stock-row" data-kode="${item.symbol}">
+        <div>
+          <div class="kode">${item.symbol}</div>
+          <div class="nama">${item.name}</div>
+        </div>
+        <div class="harga">
+          ${item.available
+            ? `<div>Rp ${item.close.toLocaleString("id-ID")}</div><div class="${item.changePercent >= 0 ? 'green' : 'red'}" style="font-size:12px;">${item.changePercent >= 0 ? '+' : ''}${item.changePercent.toFixed(2)}%</div>`
+            : `<div style="color:var(--text2);font-size:12px;">N/A</div>`}
+        </div>
+      </div>
+    `).join("");
+
+    list.querySelectorAll(".sector-stock-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const kode = row.getAttribute("data-kode");
+        overlay.classList.remove("open");
+        document.getElementById("stockInput").value = kode;
+        document.getElementById("searchSection").scrollIntoView({ behavior: "smooth" });
+        analyzeStock(kode);
+      });
+    });
+
+  } catch (err) {
+    console.error("Gagal load data sektor:", err);
+    list.innerHTML = `<p style="text-align:center;padding:20px;color:var(--red);">Gagal memuat data. Coba lagi nanti.</p>`;
+  }
+}
+
+// =========================
+// PREMIUM MODAL
+// =========================
+function setupPremiumModal() {
+  const overlay = document.createElement("div");
+  overlay.className = "premium-modal-overlay";
+  overlay.id = "premiumModalOverlay";
+  overlay.innerHTML = `
+    <div class="premium-modal">
+      <span class="close-x" id="premiumModalClose">✕</span>
+      <h3>⭐ Upgrade ke Premium</h3>
+      <p style="color:var(--text2);font-size:13px;margin-top:6px;">Pilih paket yang sesuai kebutuhan trading kamu.</p>
+
+      <div class="plan-option" data-plan="bulanan">
+        <div class="plan-title">Bulanan</div>
+        <div class="plan-price">Rp99.000 / bulan</div>
+        <ul>
+          <li>AI Scanner & Trading Plan</li>
+          <li>Support Resistance, Buy Area, SL, TP1-TP3</li>
+          <li>Bandarmology & AI Chat</li>
+        </ul>
+      </div>
+
+      <div class="plan-option" data-plan="tahunan">
+        <div class="plan-title">Tahunan (Hemat 30%)</div>
+        <div class="plan-price">Rp799.000 / tahun</div>
+        <ul>
+          <li>Semua fitur paket Bulanan</li>
+          <li>Prioritas fitur baru</li>
+          <li>Grup diskusi khusus member</li>
+        </ul>
+      </div>
+
+      <p style="text-align:center;color:var(--text2);font-size:12px;margin-top:16px;">
+        Pembayaran akan diarahkan ke halaman checkout.
+      </p>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.classList.remove("open");
+  });
+  document.getElementById("premiumModalClose").addEventListener("click", () => {
+    overlay.classList.remove("open");
+  });
+
+  overlay.querySelectorAll(".plan-option").forEach(el => {
+    el.addEventListener("click", () => {
+      const plan = el.getAttribute("data-plan");
+      // TODO: arahkan ke halaman/payment gateway sungguhan saat sudah siap
+      alert(`Kamu memilih paket ${plan}. Fitur pembayaran akan segera hadir.`);
+    });
+  });
+
+  // Attach ke semua tombol "Upgrade Premium" (banner + section premium)
+  document.querySelectorAll(".premium-banner button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      overlay.classList.add("open");
+    });
   });
 }
 
@@ -588,7 +879,7 @@ function setupChatWidget() {
       });
 
       const json = await res.json();
-      const reply = json.reply || "Maaf, terjadi kesalahan.";
+      const reply = json.reply || "Maaf, terjadi kesalahan. Coba tanya lagi ya.";
 
       loadingBubble.innerHTML = typeof marked !== "undefined" ? marked.parse(reply) : reply;
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
