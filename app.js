@@ -1,9 +1,19 @@
 // =========================
+// DATA GLOBAL
+// =========================
+let ihsgData = { value: null, changePercent: null };
+let companies = [];
+
+// =========================
 // HELPER: UPDATE CHART
 // =========================
 function updateChart(symbol) {
   const container = document.getElementById("tvchart");
   if (!container) return;
+
+  if (window.tvWidget) {
+    try { window.tvWidget.remove(); } catch (e) {}
+  }
 
   container.innerHTML = "";
   window.tvWidget = new TradingView.widget({
@@ -44,12 +54,12 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
-  // Chart default = IHSG
   updateChart("IDX:COMPOSITE");
 
   loadIHSG();
   loadMarketMovers();
   setupChatWidget();
+  loadCompanies().then(setupAutocomplete);
 
 });
 
@@ -62,8 +72,10 @@ async function loadIHSG() {
     const json = await res.json();
     const d = json.data || json;
 
-    const value = Number(d.ClosePrice || d.LastPrice || d.close || d.value || 0);
-    const changePercent = Number(d.ChangePercent || d.change_percent || d.percent || 0);
+    const value = Number(d.close || d.ClosePrice || d.LastPrice || d.value || 0);
+    const changePercent = Number(d.changePercent || d.ChangePercent || d.change_percent || d.percent || 0);
+
+    ihsgData = { value, changePercent };
 
     const ihsgEl = document.getElementById("ihsg");
     const persenEl = document.getElementById("ihsgPersen");
@@ -125,11 +137,11 @@ async function analyzeStock() {
       return;
     }
 
-    const close = Number(d.ClosePrice || d.LastPrice || d.close || d.last_price || 0);
-    const open = Number(d.OpenPrice || d.open || close);
-    const high = Number(d.HighPrice || d.high || close);
-    const low = Number(d.LowPrice || d.low || close);
-    const volume = Number(d.Volume || d.volume || 0);
+    const close = Number(d.close || d.ClosePrice || d.LastPrice || d.last_price || 0);
+    const open = Number(d.open || d.OpenPrice || close);
+    const high = Number(d.high || d.HighPrice || close);
+    const low = Number(d.low || d.LowPrice || close);
+    const volume = Number(d.volume || d.Volume || 0);
 
     if (close === 0) {
       alert("Data harga tidak tersedia untuk saham ini.");
@@ -174,7 +186,6 @@ async function analyzeStock() {
     const tp2 = Math.round(close * 1.06);
     const tp3 = Math.round(close * 1.09);
 
-    // Update chart otomatis ke saham yang dicari
     updateChart("IDX:" + kode);
 
     document.getElementById("analysisCard").innerHTML = `
@@ -328,6 +339,68 @@ function renderTopPick(data) {
 }
 
 // =========================
+// AUTOCOMPLETE SEMUA EMITEN BEI
+// =========================
+async function loadCompanies() {
+  const cached = localStorage.getItem("companies");
+  const cachedAt = Number(localStorage.getItem("companiesAt") || 0);
+  if (cached && Date.now() - cachedAt < 86400000) {
+    companies = JSON.parse(cached);
+    return;
+  }
+  try {
+    const res = await fetch(`/api/analyze?companies=true`);
+    const json = await res.json();
+    companies = json.data || [];
+    localStorage.setItem("companies", JSON.stringify(companies));
+    localStorage.setItem("companiesAt", Date.now());
+  } catch (err) {
+    console.error("Gagal load daftar emiten:", err);
+  }
+}
+
+function setupAutocomplete() {
+  const input = document.getElementById("stockInput");
+  if (!input) return;
+
+  const box = document.createElement("div");
+  box.id = "autocompleteBox";
+  box.style.cssText = "position:absolute;z-index:99;background:#10192d;border:1px solid rgba(255,255,255,.1);border-radius:10px;width:100%;max-height:220px;overflow-y:auto;display:none;top:100%;left:0;";
+  input.parentElement.style.position = "relative";
+  input.parentElement.appendChild(box);
+
+  input.addEventListener("input", () => {
+    const q = input.value.toUpperCase().trim();
+    if (q.length < 2) { box.style.display = "none"; return; }
+
+    const results = companies.filter(c =>
+      (c.symbol && c.symbol.includes(q)) || (c.name && c.name.toUpperCase().includes(q))
+    ).slice(0, 8);
+
+    if (results.length === 0) { box.style.display = "none"; return; }
+
+    box.innerHTML = results.map(c => `
+      <div class="ac-item" data-symbol="${c.symbol}"
+        style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid rgba(255,255,255,.05);color:#e5e9f5;">
+        <b>${c.symbol}</b> <span style="color:#8b9bb4;">— ${c.name}</span>
+      </div>`).join("");
+    box.style.display = "block";
+
+    box.querySelectorAll(".ac-item").forEach(el => {
+      el.addEventListener("click", () => {
+        input.value = el.dataset.symbol;
+        box.style.display = "none";
+        analyzeStock();
+      });
+    });
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!box.contains(e.target) && e.target !== input) box.style.display = "none";
+  });
+}
+
+// =========================
 // AI CHAT WIDGET (FULL SCREEN)
 // =========================
 function setupChatWidget() {
@@ -378,9 +451,9 @@ function setupChatWidget() {
 
     <div id="chatMessages" style="flex:1;overflow-y:auto;padding:20px 16px;display:flex;flex-direction:column;gap:16px;">
       <div class="ai-msg">
-        Halo! Silakan tanya di IzyAnalisaAI kalau BBRI pas opening jelek banget, atau soal saham BEI dan arah IHSG lainnya.
+        Halo! Silakan tanya di IzyAnalisaAI ya kak ^__^
         <br><br>
-        Contoh: <i>"Gimana arah IHSG besok?"</i> atau <i>"BMRI potensi naik ga?"</i>
+        Ada pertanyaan tentang IHSG? Atau ada emiten yang mau kamu analisa?
       </div>
     </div>
 
@@ -460,12 +533,9 @@ function setupChatWidget() {
     messagesDiv.appendChild(loadingBubble);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
-    const ihsgValue = document.getElementById("ihsg")?.textContent || "tidak tersedia";
-    const ihsgPersen = document.getElementById("ihsgPersen")?.textContent || "tidak tersedia";
-
     let context = {
-      ihsg: ihsgValue,
-      ihsgPersen: ihsgPersen,
+      ihsg: ihsgData.value ? ihsgData.value.toLocaleString("id-ID") : "tidak tersedia",
+      ihsgPersen: ihsgData.changePercent !== null ? (ihsgData.changePercent >= 0 ? "+" : "") + ihsgData.changePercent.toFixed(2) + "%" : "tidak tersedia",
       waktu: new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })
     };
 
@@ -485,11 +555,11 @@ function setupChatWidget() {
         const d = stockJson.data || stockJson;
 
         if (d && Object.keys(d).length > 0) {
-          const close = Number(d.ClosePrice || d.LastPrice || d.close || 0);
-          const open = Number(d.OpenPrice || d.open || close);
-          const high = Number(d.HighPrice || d.high || close);
-          const low = Number(d.LowPrice || d.low || close);
-          const volume = Number(d.Volume || d.volume || 0);
+          const close = Number(d.close || d.ClosePrice || d.LastPrice || 0);
+          const open = Number(d.open || d.OpenPrice || close);
+          const high = Number(d.high || d.HighPrice || close);
+          const low = Number(d.low || d.LowPrice || close);
+          const volume = Number(d.volume || d.Volume || 0);
 
           if (close > 0) {
             context.saham = {
