@@ -1,6 +1,3 @@
-const API_KEY = "cbe37ed3-0127-568e-7aff-c15a5f7b";
-const BASE_URL = "https://api.goapi.io/stock/idx";
-
 document.addEventListener("DOMContentLoaded", () => {
 
   // Sembunyikan loading spinner
@@ -44,6 +41,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Load data IHSG saat halaman dibuka
   loadIHSG();
 
+  // Setup AI Chat
+  setupChatWidget();
+
 });
 
 // =========================
@@ -51,15 +51,11 @@ document.addEventListener("DOMContentLoaded", () => {
 // =========================
 async function loadIHSG() {
   try {
-    const res = await fetch(`${BASE_URL}/COMPOSITE`, {
-      headers: { "X-API-KEY": API_KEY }
-    });
-
+    const res = await fetch(`/api/analyze?kode=COMPOSITE`);
     const json = await res.json();
     const d = json.data || json;
 
     const value = Number(d.ClosePrice || d.LastPrice || d.close || d.value || 0);
-    const change = Number(d.Change || d.change || 0);
     const changePercent = Number(d.ChangePercent || d.change_percent || d.percent || 0);
 
     const ihsgEl = document.getElementById("ihsg");
@@ -108,9 +104,7 @@ async function analyzeStock() {
 
   try {
 
-    const res = await fetch(`${BASE_URL}/${kode}`, {
-      headers: { "X-API-KEY": API_KEY }
-    });
+    const res = await fetch(`/api/analyze?kode=${kode}`);
 
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
@@ -124,7 +118,6 @@ async function analyzeStock() {
       return;
     }
 
-    // Fleksibel terhadap berbagai kemungkinan nama field
     const close = Number(d.ClosePrice || d.LastPrice || d.close || d.last_price || 0);
     const open = Number(d.OpenPrice || d.open || close);
     const high = Number(d.HighPrice || d.high || close);
@@ -137,9 +130,25 @@ async function analyzeStock() {
     }
 
     let bullish = 50;
-    if (close > open) bullish += 15;
-    if (close >= high * 0.98) bullish += 10;
-    if (close <= low * 1.02) bullish -= 10;
+    let alasan = [];
+
+    if (close > open) {
+      bullish += 15;
+      alasan.push("Harga close lebih tinggi dari open (momentum positif)");
+    } else {
+      alasan.push("Harga close lebih rendah dari open (momentum lemah)");
+    }
+
+    if (close >= high * 0.98) {
+      bullish += 10;
+      alasan.push("Harga mendekati level tertinggi hari ini");
+    }
+
+    if (close <= low * 1.02) {
+      bullish -= 10;
+      alasan.push("Harga mendekati level terendah hari ini");
+    }
+
     if (bullish > 95) bullish = 95;
     if (bullish < 5) bullish = 5;
 
@@ -218,8 +227,19 @@ async function analyzeStock() {
         </div>
       </div>
 
-      <p style="margin-top:15px;color:var(--text2);font-size:13px;">
+      <div style="margin-top:18px;padding:15px;background:#10192d;border-radius:12px;">
+        <p style="color:var(--text2);font-size:13px;margin-bottom:8px;font-weight:600;">💡 Alasan AI:</p>
+        <ul style="color:var(--text2);font-size:13px;padding-left:18px;line-height:1.8;">
+          ${alasan.map(a => `<li>${a}</li>`).join("")}
+        </ul>
+      </div>
+
+      <p style="margin-top:15px;color:var(--text2);font-size:12px;">
         Volume: ${volume.toLocaleString("id-ID")}
+      </p>
+
+      <p style="margin-top:15px;padding:12px;background:rgba(255,201,60,.1);border-radius:10px;color:var(--yellow);font-size:12px;text-align:center;">
+        ⚠️ DYOR (Do Your Own Research) - Ini bukan saran finansial. Confidence Score menunjukkan keyakinan model, bukan jaminan hasil.
       </p>
     `;
 
@@ -227,10 +247,146 @@ async function analyzeStock() {
 
   } catch (err) {
     console.error(err);
-    alert("API gagal dihubungi. Cek koneksi atau API key.");
+    alert("API gagal dihubungi. Cek koneksi atau coba lagi nanti.");
   } finally {
     btn.textContent = originalText;
     btn.disabled = false;
   }
+
+}
+
+// =========================
+// AI CHAT WIDGET
+// =========================
+function setupChatWidget() {
+
+  // Buat floating chat button
+  const chatButton = document.createElement("div");
+  chatButton.id = "chatFloatBtn";
+  chatButton.innerHTML = "🤖";
+  chatButton.style.cssText = `
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg,#00C2FF,#00E5A8);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0,194,255,.4);
+    z-index: 1000;
+    transition: .25s;
+  `;
+  document.body.appendChild(chatButton);
+
+  // Buat chat panel
+  const chatPanel = document.createElement("div");
+  chatPanel.id = "chatPanel";
+  chatPanel.style.cssText = `
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 100%;
+    max-width: 400px;
+    height: 70vh;
+    background: #151d33;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -10px 40px rgba(0,0,0,.5);
+    z-index: 1001;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  `;
+
+  chatPanel.innerHTML = `
+    <div style="padding:16px;background:#10192d;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.06);">
+      <strong style="color:#00C2FF;">🤖 AI Chat - IzyAnalisaAI</strong>
+      <span id="closeChatBtn" style="cursor:pointer;font-size:20px;color:#aeb7d1;">✕</span>
+    </div>
+    <div id="chatMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;">
+      <div style="background:#1b2644;padding:12px 15px;border-radius:14px;color:#aeb7d1;font-size:14px;">
+        Halo! Saya AI analis IzyAnalisaAI. Tanya apa saja soal saham atau IHSG, contoh: "Gimana arah IHSG besok?" atau "BBRI potensi naik ga?"
+      </div>
+    </div>
+    <div style="padding:14px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:10px;">
+      <input id="chatInput" type="text" placeholder="Tanya AI..." style="flex:1;background:#0f172a;border:none;padding:12px;border-radius:12px;color:white;outline:none;">
+      <button id="chatSendBtn" style="background:#00C2FF;border:none;padding:12px 18px;border-radius:12px;color:#081018;font-weight:700;cursor:pointer;">Kirim</button>
+    </div>
+  `;
+
+  document.body.appendChild(chatPanel);
+
+  chatButton.addEventListener("click", () => {
+    chatPanel.style.display = chatPanel.style.display === "none" ? "flex" : "none";
+  });
+
+  document.getElementById("closeChatBtn").addEventListener("click", () => {
+    chatPanel.style.display = "none";
+  });
+
+  const sendMessage = async () => {
+    const input = document.getElementById("chatInput");
+    const message = input.value.trim();
+    if (!message) return;
+
+    const messagesDiv = document.getElementById("chatMessages");
+
+    // Tampilkan pesan user
+    messagesDiv.innerHTML += `
+      <div style="background:#00C2FF;color:#081018;padding:12px 15px;border-radius:14px;font-size:14px;align-self:flex-end;max-width:80%;">
+        ${message}
+      </div>
+    `;
+
+    input.value = "";
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+    // Tampilkan loading
+    const loadingId = "loading-" + Date.now();
+    messagesDiv.innerHTML += `
+      <div id="${loadingId}" style="background:#1b2644;padding:12px 15px;border-radius:14px;color:#aeb7d1;font-size:14px;">
+        Mengetik...
+      </div>
+    `;
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message })
+      });
+
+      const json = await res.json();
+      const reply = json.reply || "Maaf, terjadi kesalahan.";
+
+      document.getElementById(loadingId).remove();
+
+      messagesDiv.innerHTML += `
+        <div style="background:#1b2644;padding:12px 15px;border-radius:14px;color:white;font-size:14px;white-space:pre-wrap;">
+          ${reply}
+        </div>
+      `;
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+    } catch (err) {
+      console.error(err);
+      document.getElementById(loadingId).remove();
+      messagesDiv.innerHTML += `
+        <div style="background:#ff4d5a;padding:12px 15px;border-radius:14px;color:white;font-size:14px;">
+          Gagal menghubungi AI. Coba lagi nanti.
+        </div>
+      `;
+    }
+  };
+
+  document.getElementById("chatSendBtn").addEventListener("click", sendMessage);
+  document.getElementById("chatInput").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") sendMessage();
+  });
 
 }
