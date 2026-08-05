@@ -1,6 +1,3 @@
-// pages/api/saham.js
-// Menggantikan GoAPI dengan Parse.bot IDX API
-
 const PARSE_BASE = "https://api.parse.bot/scraper/3344e652-0a91-4a3c-96f6-d64b4d7f7369";
 const API_KEY = process.env.PARSE_API_KEY;
 
@@ -23,12 +20,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Khusus IHSG / COMPOSITE
+    // Khusus IHSG
     if (kode.toUpperCase() === "COMPOSITE" || kode.toUpperCase() === "IHSG") {
       const indexRes = await fetch(`${PARSE_BASE}/get_market_index_summary`, {
         headers: { "X-API-Key": API_KEY },
       });
-
       const indexJson = await indexRes.json();
 
       if (!indexRes.ok) {
@@ -38,24 +34,21 @@ export default async function handler(req, res) {
         });
       }
 
-      // Cari COMPOSITE / IHSG
       const indices = indexJson?.data || indexJson || [];
-      const ihsg = Array.isArray(indices)
-        ? indices.find(
-            (i) =>
-              i.IndexCode === "COMPOSITE" ||
-              i.index_code === "COMPOSITE" ||
-              i.Code === "COMPOSITE" ||
-              (i.IndexName || "").toLowerCase().includes("composite")
-          )
-        : null;
+      const list = Array.isArray(indices) ? indices : indices?.data || [];
+
+      const ihsg = list.find(
+        (i) =>
+          (i.IndexCode || i.index_code || i.Code || "").toUpperCase() === "COMPOSITE" ||
+          (i.IndexName || i.index_name || "").toLowerCase().includes("composite")
+      );
 
       if (!ihsg) {
         return res.status(404).json({ error: "Data IHSG tidak ditemukan" });
       }
 
       const close = Number(ihsg.LastVal || ihsg.last_val || ihsg.Close || 0);
-      const prev = Number(ihsg.PrevVal || ihsg.prev_val || ihsg.Previous || close);
+      const prev = Number(ihsg.PrevVal || ihsg.prev_val || close);
       const changePercent = prev ? ((close - prev) / prev) * 100 : Number(ihsg.ChgPct || ihsg.chg_pct || 0);
 
       return res.status(200).json({
@@ -72,30 +65,26 @@ export default async function handler(req, res) {
       });
     }
 
-    // Ambil data semua saham (summary harian)
-    // Kita ambil beberapa halaman supaya bisa ketemu saham yang diminta
+    // Cari saham biasa
     let found = null;
     const limit = 100;
     let start = 0;
 
-    // Coba maksimal 10 halaman (1000 saham)
     for (let i = 0; i < 10; i++) {
       const url = `\( {PARSE_BASE}/get_stock_summary?start= \){start}&limit=${limit}`;
       const response = await fetch(url, {
         headers: { "X-API-Key": API_KEY },
       });
-
       const json = await response.json();
 
       if (!response.ok) {
         return res.status(response.status).json({
-          error: "Gagal mengambil data saham dari Parse.bot",
+          error: "Gagal mengambil data saham",
           detail: json,
         });
       }
 
       const list = json?.data?.data || json?.data || json || [];
-
       if (!Array.isArray(list) || list.length === 0) break;
 
       found = list.find(
@@ -114,19 +103,13 @@ export default async function handler(req, res) {
       });
     }
 
-    // Mapping ke format yang diharapkan frontend
     const close = Number(found.Close || found.close || found.Last || found.last || 0);
     const open = Number(found.Open || found.open || close);
     const high = Number(found.High || found.high || close);
     const low = Number(found.Low || found.low || close);
     const volume = Number(found.Volume || found.volume || 0);
     const changePercent = Number(
-      found.ChangePercent ||
-        found.change_percent ||
-        found.Change ||
-        found.Pct ||
-        found.pct ||
-        0
+      found.ChangePercent || found.change_percent || found.Change || found.Pct || found.pct || 0
     );
 
     return res.status(200).json({
