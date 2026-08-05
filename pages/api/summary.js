@@ -1,5 +1,5 @@
 const PARSE_BASE = "https://api.parse.bot/scraper/3344e652-0a91-4a3c-96f6-d64b4d7f7369";
-const API_KEY = process.env.PARSE_API_KEY;
+const API_KEY = process.env.PARSEBOT_API_KEY;
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   }
 
   if (!API_KEY) {
-    return res.status(500).json({ error: "PARSE_API_KEY belum dikonfigurasi" });
+    return res.status(500).json({ error: "PARSEBOT_API_KEY belum dikonfigurasi" });
   }
 
   try {
@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     const limit = 100;
 
     for (let start = 0; start < 300; start += limit) {
-      const url = `\( {PARSE_BASE}/get_stock_summary?start= \){start}&limit=${limit}`;
+      const url = `${PARSE_BASE}/get_stock_summary?start=${start}&limit=${limit}`;
       const response = await fetch(url, {
         headers: { "X-API-Key": API_KEY },
       });
