@@ -5,6 +5,7 @@ import Skeleton from "@/components/Skeleton";
 import StockRow from "@/components/StockRow";
 import ChartPlaceholder from "@/components/ChartPlaceholder";
 import SectorBottomSheet from "@/components/SectorBottomSheet";
+import { FixedSizeList as List } from 'react-window';
 
 export default function Home() {
   const [ihsg, setIhsg] = useState<any>({ loading: true, close: 0, changePercent: 0 });
@@ -68,10 +69,22 @@ export default function Home() {
         <div>
           <h3 className="text-lg font-bold tracking-tight">🔥 Top Pick AI</h3>
           <div className="space-y-3 mt-3">
-            {topLoading ? Array.from({length:3}).map((_,i)=>(<Skeleton key={i} className="h-16 w-full" />)) : (
-              topPicks.map((s:any)=> (
-                <StockRow key={s.kode || s.symbol} stock={{ kode: s.kode||s.symbol, name: s.name, close: s.close||0, changePercent: s.changePercent||0 }} onClick={() => window.location.href = `/stock/${(s.kode||s.symbol)}`} onToggle={() => alert('toggle watchlist')} />
-              ))
+            {topLoading ? (
+              Array.from({length:3}).map((_,i)=>(<Skeleton key={i} className="h-16 w-full" />))
+            ) : (
+              topPicks.length > 6 ? (
+                <div className="h-[360px]">
+                  <List height={360} itemCount={topPicks.length} itemSize={76} width={'100%'}>
+                    {({index, style}) => (
+                      <div style={style} className="p-1"><StockRow stock={{ kode: topPicks[index].kode||topPicks[index].symbol, name: topPicks[index].name, close: topPicks[index].close||0, changePercent: topPicks[index].changePercent||0, spark: topPicks[index].spark }} onClick={() => window.location.href = `/stock/${(topPicks[index].kode||topPicks[index].symbol)}`} onToggle={() => alert('toggle watchlist')} /></div>
+                    )}
+                  </List>
+                </div>
+              ) : (
+                topPicks.map((s:any)=> (
+                  <StockRow key={s.kode || s.symbol} stock={{ kode: s.kode||s.symbol, name: s.name, close: s.close||0, changePercent: s.changePercent||0, spark: s.spark }} onClick={() => window.location.href = `/stock/${(s.kode||s.symbol)}`} onToggle={() => alert('toggle watchlist')} />
+                ))
+              )
             )}
           </div>
         </div>
