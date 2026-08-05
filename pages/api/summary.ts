@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { fetchTopPicks } from "../../lib/parsebot";
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!process.env.PARSEBOT_API_KEY) {
-    // Mock top picks (frontend mengharapkan array dengan { kode, name, close, changePercent })
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const hasKey = Boolean(process.env.PARSE_API_KEY || process.env.PARSEBOT_API_KEY);
+  if (!hasKey) {
     const mock = [
       { kode: "BBCA", name: "Bank Central Asia", close: 37850, changePercent: 0.95 },
       { kode: "TLKM", name: "Telkom Indonesia", close: 3350, changePercent: -0.45 },
@@ -13,5 +14,11 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(200).json({ data: mock });
   }
 
-  return res.status(501).json({ error: "Real PARSEBOT fetch not implemented in stub." });
+  try {
+    const top = await fetchTopPicks();
+    return res.status(200).json({ data: top });
+  } catch (err: any) {
+    console.error("ParseBot summary error", err.message || err);
+    return res.status(502).json({ error: "Failed to fetch top picks from Parse.bot" });
+  }
 }
