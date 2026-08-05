@@ -1,7 +1,8 @@
 "use client";
 
+import { FixedSizeList as List } from 'react-window';
 import { useEffect, useState } from "react";
-import Skeleton from "./Skeleton";
+import Skeleton from './Skeleton';
 
 export default function SectorBottomSheet({ name, onClose }: { name: string; onClose: () => void }) {
   const [loading, setLoading] = useState(true);
@@ -18,10 +19,25 @@ export default function SectorBottomSheet({ name, onClose }: { name: string; onC
     return () => { mounted = false; };
   }, [name]);
 
+  const Row = ({ index, style }: any) => {
+    const s = stocks[index];
+    const code = (s.kode || s.symbol || s.symbols || '').toUpperCase();
+    const pct = Number(s.changePercent || s.change_percent || 0);
+    return (
+      <div style={style} className="p-3 bg-[#111a2e] border-b border-[#162035] flex justify-between items-center">
+        <div>
+          <div className="font-bold">{code}</div>
+          <div className="text-xs text-gray-400">{s.name || s.company || ''}</div>
+        </div>
+        <div className={`text-sm font-semibold ${pct >= 0 ? 'text-[#00d26a]' : 'text-[#ff4d5a]'}`}>{pct >= 0 ? '+' : ''}{pct.toFixed(2)}%</div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div onClick={onClose} className="absolute inset-0 bg-black/60" />
-      <div className="relative w-full max-w-md mx-auto bg-[#0a0e1a] border-t border-[#162035] rounded-t-[22px] p-4 max-h-[70vh] overflow-y-auto animate-slide-up">
+      <div className="relative w-full max-w-md mx-auto bg-[#0a0e1a] border-t border-[#162035] rounded-t-[22px] p-4 max-h-[70vh] overflow-hidden animate-slide-up">
         <div className="w-12 h-1.5 bg-gray-700 rounded-full mx-auto mb-4" />
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-bold">Sektor: {name}</h3>
@@ -35,18 +51,10 @@ export default function SectorBottomSheet({ name, onClose }: { name: string; onC
             <Skeleton className="h-12 w-full" />
           </div>
         ) : (
-          <div className="space-y-3">
-            {stocks.map((s: any) => (
-              <div key={s.kode || s.symbol || s.symbols} className="p-3 bg-[#111a2e] rounded-lg flex justify-between">
-                <div>
-                  <div className="font-bold">{(s.kode || s.symbol || s.symbols || '').toUpperCase()}</div>
-                  <div className="text-xs text-gray-400">{s.name || s.company || ''}</div>
-                </div>
-                <div className={`text-sm font-semibold ${ (s.changePercent||s.change_percent||0) >=0 ? 'text-[#00d26a]' : 'text-[#ff4d5a]' }`}>
-                  {((s.changePercent||s.change_percent||0) >=0 ? '+' : '')}{Number(s.changePercent||s.change_percent||0).toFixed(2)}%
-                </div>
-              </div>
-            ))}
+          <div className="h-[56vh]">
+            <List height={560} itemCount={stocks.length} itemSize={68} width={'100%'}>
+              {Row}
+            </List>
           </div>
         )}
 
