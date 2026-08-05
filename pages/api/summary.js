@@ -12,21 +12,26 @@ export default async function handler(req, res) {
 
   try {
     const limit = 100;
-    // Mengambil 3 halaman (total 300 saham) secara paralel
-    const pageOffsets = [0, 100, 200];
+    const pages = 10; // Mendapatkan maksimal 1000 saham Indonesia sekaligus
     
-    const fetchPromises = pageOffsets.map(async (start) => {
-      const url = `${PARSE_BASE}/get_stock_summary?start=${start}&limit=${limit}`;
-      const response = await fetch(url, {
-        headers: { "X-API-Key": API_KEY },
-      });
-      if (!response.ok) return [];
-      const json = await response.json();
-      return json?.data?.data || json?.data || json || [];
+    // Tarik data secara paralel untuk performa secepat kilat (Aturan Optimasi) [1]
+    const fetchPromises = Array.from({ length: pages }, (_, i) => {
+      const url = `${PARSE_BASE}/get_stock_summary?start=${i * limit}&limit=${limit}`;
+      return fetch(url, { headers: { "X-API-Key": API_KEY } })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null);
     });
 
     const results = await Promise.all(fetchPromises);
-    const allStocks = results.flat();
+    let allStocks = [];
+
+    for (const json of results) {
+      if (!json) continue;
+      const list = json?.data?.data || json?.data || json || [];
+      if (Array.isArray(list)) {
+        allStocks = allStocks.concat(list);
+      }
+    }
 
     const mapped = allStocks
       .map((item) => {
@@ -36,22 +41,15 @@ export default async function handler(req, res) {
         );
         const close = Number(item.Close || item.close || item.Last || 0);
         const name = item.StockName || item.Name || item.name || "";
-
         return { kode, name, changePercent, close };
       })
       .filter((item) => item.kode && !isNaN(item.changePercent));
 
-    // Urutkan berdasarkan top gainers
     const sorted = [...mapped].sort((a, b) => b.changePercent - a.changePercent);
 
-    return res.status(200).json({
-      data: sorted,
-    });
+    return res.status(200).json({ data: sorted });
   } catch (err) {
-    console.error("Parse.bot summary error:", err);
-    return res.status(500).json({
-      error: "Gagal mengambil data summary",
-      message: err.message,
-    });
+    console.error(err);
+    return res.status(500).json({ error: "Gagal mengambil data summary" });
   }
 }
