@@ -1,4 +1,3 @@
 {
-  "buildCommand": "echo 'OK'",
-  "outputDirectory": "public"
+  "framework": "nextjs"
 }
