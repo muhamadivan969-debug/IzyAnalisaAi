@@ -11,22 +11,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    let allStocks = [];
     const limit = 100;
-
-    for (let start = 0; start < 300; start += limit) {
+    // Mengambil 3 halaman (total 300 saham) secara paralel
+    const pageOffsets = [0, 100, 200];
+    
+    const fetchPromises = pageOffsets.map(async (start) => {
       const url = `${PARSE_BASE}/get_stock_summary?start=${start}&limit=${limit}`;
       const response = await fetch(url, {
         headers: { "X-API-Key": API_KEY },
       });
+      if (!response.ok) return [];
       const json = await response.json();
-      if (!response.ok) break;
+      return json?.data?.data || json?.data || json || [];
+    });
 
-      const list = json?.data?.data || json?.data || json || [];
-      if (!Array.isArray(list) || list.length === 0) break;
-
-      allStocks = allStocks.concat(list);
-    }
+    const results = await Promise.all(fetchPromises);
+    const allStocks = results.flat();
 
     const mapped = allStocks
       .map((item) => {
@@ -41,6 +41,7 @@ export default async function handler(req, res) {
       })
       .filter((item) => item.kode && !isNaN(item.changePercent));
 
+    // Urutkan berdasarkan top gainers
     const sorted = [...mapped].sort((a, b) => b.changePercent - a.changePercent);
 
     return res.status(200).json({
