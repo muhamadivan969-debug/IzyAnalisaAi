@@ -1,6 +1,6 @@
-// pages/_app.js
-import "@/app/globals.css";
+// DEPRECATED: This file forwards to the TypeScript App implementation to avoid duplicate definitions.
+// The canonical App is pages/_app.tsx — keep that file as the source of truth.
 
-export default function App({ Component, pageProps }) {
-  return <Component {...pageProps} />;
-}
+import App from "./_app.tsx";
+
+export default App;
