@@ -166,7 +166,7 @@ function hitungLevelTrading(open, high, low, close) {
 
 async function loadIHSG() {
   try {
-    const res = await fetch('/api/analyze?kode=COMPOSITE'); 
+    const res = await fetch('/api/saham?kode=COMPOSITE');
     const json = await res.json();
     const d = json.data || json;
     const value = Number(d.close || d.ClosePrice || d.LastPrice || d.value || 0);
@@ -276,16 +276,23 @@ function renderTopPick(data) {
 }
 
 async function loadCompanies() {
-  companies = [
-    { symbol: "BBRI", name: "Bank Rakyat Indonesia" },
-    { symbol: "BMRI", name: "Bank Mandiri" },
-    { symbol: "BBCA", name: "Bank Central Asia" },
-    { symbol: "BBNI", name: "Bank Negara Indonesia" },
-    { symbol: "TLKM", name: "Telkom Indonesia" },
-    { symbol: "ASII", name: "Astra International" },
-    { symbol: "UNVR", name: "Unilever Indonesia" },
-    { symbol: "GOTO", name: "GoTo Gojek Tokopedia" }
-  ];
+  const cached = localStorage.getItem("companies");
+  const cachedAt = Number(localStorage.getItem("companiesAt") || 0);
+  if (cached && Date.now() - cachedAt < 86400000) {
+    companies = JSON.parse(cached);
+    return;
+  }
+  try {
+    const res = await fetch(`/api/saham?companies=true`);
+    const json = await res.json();
+    companies = json.data || [];
+    if (companies.length > 0) {
+      localStorage.setItem("companies", JSON.stringify(companies));
+      localStorage.setItem("companiesAt", Date.now());
+    }
+  } catch (err) {
+    console.error("Gagal load daftar emiten:", err);
+  }
 }
 
 function setupAutocomplete() {
@@ -378,14 +385,346 @@ function setupProfilMenu() {
   if (tentang) tentang.addEventListener("click", () => alert("IzyAnalisaAI - Smart Indonesian Stock Intelligence.\nAnalisa saham BEI berbasis AI Score, RSI, MACD, EMA, Volume, Support & Resistance."));
 }
 
+// =========================
+// HEATMAP SEKTOR (klik untuk lihat semua saham di sektor)
+// =========================
 function setupHeatmap() {
-  // Placeholder heatmap
+  const heatmapEl = document.querySelector(".heatmap");
+  if (!heatmapEl) return;
+
+  const overlay = document.createElement("div");
+  overlay.className = "sector-modal-overlay";
+  overlay.id = "sectorModalOverlay";
+  overlay.innerHTML = `
+    <div class="sector-modal">
+      <div class="sector-modal-header">
+        <h3 id="sectorModalTitle">Sektor</h3>
+        <span id="sectorModalClose">✕</span>
+      </div>
+      <div style="padding:0 14px 10px;">
+        <input id="sectorSearchInput" type="text" placeholder="Cari kode atau nama saham..."
+          style="width:100%;background:#151d33;border:1px solid rgba(255,255,255,.1);padding:11px 14px;border-radius:12px;color:white;outline:none;font-size:14px;">
+      </div>
+      <div class="sector-modal-list" id="sectorModalList">
+        <p style="text-align:center;padding:20px;color:var(--text2);">Memuat data...</p>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.classList.remove("open");
+  });
+  document.getElementById("sectorModalClose").addEventListener("click", () => {
+    overlay.classList.remove("open");
+  });
+  document.getElementById("sectorSearchInput").addEventListener("input", (e) => {
+    filterSectorList(e.target.value);
+  });
+
+  heatmapEl.querySelectorAll(".heat").forEach(el => {
+    el.style.cursor = "pointer";
+    el.addEventListener("click", () => openSectorModal(el.textContent.trim()));
+  });
 }
 
+let currentSectorData = [];
+
+async function openSectorModal(sectorName) {
+  const overlay = document.getElementById("sectorModalOverlay");
+  const title = document.getElementById("sectorModalTitle");
+  const list = document.getElementById("sectorModalList");
+  const searchInput = document.getElementById("sectorSearchInput");
+
+  title.textContent = `🌡️ Sektor ${sectorName}`;
+  searchInput.value = "";
+  list.innerHTML = `<p style="text-align:center;padding:20px;color:var(--text2);">Memuat data saham ${sectorName}...</p>`;
+  overlay.classList.add("open");
+
+  try {
+    const res = await fetch(`/api/sector?name=${encodeURIComponent(sectorName)}`);
+    const json = await res.json();
+    const data = json.data || [];
+
+    currentSectorData = data;
+
+    if (data.length === 0) {
+      list.innerHTML = `<p style="text-align:center;padding:20px;color:var(--text2);">Data saham untuk sektor ini belum tersedia.</p>`;
+      return;
+    }
+
+    renderSectorList(data);
+
+  } catch (err) {
+    console.error("Gagal load data sektor:", err);
+    list.innerHTML = `<p style="text-align:center;padding:20px;color:var(--red);">Gagal memuat data. Coba lagi nanti.</p>`;
+  }
+}
+
+function renderSectorList(data) {
+  const list = document.getElementById("sectorModalList");
+  const overlay = document.getElementById("sectorModalOverlay");
+
+  if (data.length === 0) {
+    list.innerHTML = `<p style="text-align:center;padding:20px;color:var(--text2);">Tidak ada saham yang cocok.</p>`;
+    return;
+  }
+
+  list.innerHTML = data.map(item => `
+    <div class="sector-stock-row" data-kode="${item.symbol}">
+      <div>
+        <div class="kode">${item.symbol}</div>
+        <div class="nama">${item.name}</div>
+      </div>
+      <div class="harga">
+        ${item.available
+          ? `<div>Rp ${item.close.toLocaleString("id-ID")}</div><div class="${item.changePercent >= 0 ? 'green' : 'red'}" style="font-size:12px;">${item.changePercent >= 0 ? '+' : ''}${item.changePercent.toFixed(2)}%</div>`
+          : `<div style="color:var(--text2);font-size:12px;">N/A</div>`}
+      </div>
+    </div>
+  `).join("");
+
+  list.querySelectorAll(".sector-stock-row").forEach(row => {
+    row.addEventListener("click", () => {
+      const kode = row.getAttribute("data-kode");
+      overlay.classList.remove("open");
+      document.getElementById("stockInput").value = kode;
+      document.getElementById("searchSection").scrollIntoView({ behavior: "smooth" });
+      analyzeStock(kode);
+    });
+  });
+}
+
+function filterSectorList(query) {
+  const q = query.toUpperCase().trim();
+  if (!q) {
+    renderSectorList(currentSectorData);
+    return;
+  }
+  const filtered = currentSectorData.filter(item =>
+    item.symbol.toUpperCase().includes(q) || item.name.toUpperCase().includes(q)
+  );
+  renderSectorList(filtered);
+}
+
+// =========================
+// PREMIUM MODAL
+// =========================
 function setupPremiumModal() {
-  // Placeholder premium modal
+  const overlay = document.createElement("div");
+  overlay.className = "premium-modal-overlay";
+  overlay.id = "premiumModalOverlay";
+  overlay.innerHTML = `
+    <div class="premium-modal">
+      <span class="close-x" id="premiumModalClose">✕</span>
+      <h3>⭐ Upgrade ke Premium</h3>
+      <p style="color:var(--text2);font-size:13px;margin-top:6px;">Pilih paket yang sesuai kebutuhan trading kamu.</p>
+
+      <div class="plan-option" data-plan="bulanan">
+        <div class="plan-title">Bulanan</div>
+        <div class="plan-price">Rp99.000 / bulan</div>
+        <ul>
+          <li>AI Scanner & Trading Plan</li>
+          <li>Support Resistance, Buy Area, SL, TP1-TP3</li>
+          <li>Bandarmology & AI Chat</li>
+        </ul>
+      </div>
+
+      <div class="plan-option" data-plan="tahunan">
+        <div class="plan-title">Tahunan (Hemat 30%)</div>
+        <div class="plan-price">Rp799.000 / tahun</div>
+        <ul>
+          <li>Semua fitur paket Bulanan</li>
+          <li>Prioritas fitur baru</li>
+          <li>Grup diskusi khusus member</li>
+        </ul>
+      </div>
+
+      <p style="text-align:center;color:var(--text2);font-size:12px;margin-top:16px;">
+        Pembayaran akan diarahkan ke halaman checkout.
+      </p>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.classList.remove("open");
+  });
+  document.getElementById("premiumModalClose").addEventListener("click", () => {
+    overlay.classList.remove("open");
+  });
+
+  overlay.querySelectorAll(".plan-option").forEach(el => {
+    el.addEventListener("click", () => {
+      const plan = el.getAttribute("data-plan");
+      alert(`Kamu memilih paket ${plan}. Fitur pembayaran akan segera hadir.`);
+    });
+  });
+
+  document.querySelectorAll(".premium-banner button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      overlay.classList.add("open");
+    });
+  });
 }
 
+// =========================
+// AI CHAT WIDGET (FULL SCREEN)
+// =========================
 function setupChatWidget() {
-  // Placeholder chat widget
+
+  const chatButton = document.createElement("div");
+  chatButton.id = "chatFloatBtn";
+  chatButton.innerHTML = "🤖";
+  chatButton.style.cssText = `
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg,#00C2FF,#00E5A8);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0,194,255,.4);
+    z-index: 1000;
+  `;
+  document.body.appendChild(chatButton);
+
+  const chatPanel = document.createElement("div");
+  chatPanel.id = "chatPanel";
+  chatPanel.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #05070d;
+    z-index: 2000;
+    display: none;
+    flex-direction: column;
+  `;
+
+  chatPanel.innerHTML = `
+    <div style="padding:18px 16px;background:#0a0e1a;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.08);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:22px;">🔴👁️</span>
+        <strong style="color:#00C2FF;font-size:17px;">IzyAI Analyst</strong>
+      </div>
+      <span id="closeChatBtn" style="cursor:pointer;font-size:24px;color:#aeb7d1;padding:5px;">✕</span>
+    </div>
+
+    <div id="chatMessages" style="flex:1;overflow-y:auto;padding:20px 16px;display:flex;flex-direction:column;gap:16px;">
+      <div class="ai-msg">
+        Halo! Silakan tanya di IzyAnalisaAI ya kak ^__^
+        <br><br>
+        Ada pertanyaan tentang IHSG? Atau ada emiten yang mau kamu analisa?
+      </div>
+    </div>
+
+    <div style="padding:14px 16px;border-top:1px solid rgba(255,255,255,.08);background:#0a0e1a;display:flex;gap:10px;align-items:center;">
+      <input id="chatInput" type="text" placeholder="Tanyakan apa saja..." style="flex:1;background:#151d33;border:none;padding:14px 16px;border-radius:24px;color:white;outline:none;font-size:15px;">
+      <button id="chatSendBtn" style="background:linear-gradient(135deg,#00C2FF,#00E5A8);border:none;width:44px;height:44px;border-radius:50%;color:#081018;font-weight:700;cursor:pointer;font-size:18px;flex-shrink:0;">↑</button>
+    </div>
+  `;
+
+  document.body.appendChild(chatPanel);
+
+  const style = document.createElement("style");
+  style.textContent = `
+    .user-msg {
+      background: linear-gradient(135deg,#00C2FF,#0088CC);
+      color: #081018;
+      padding: 12px 16px;
+      border-radius: 18px 18px 4px 18px;
+      font-size: 14px;
+      align-self: flex-end;
+      max-width: 85%;
+      font-weight: 500;
+    }
+    .ai-msg {
+      background: #151d33;
+      color: #e5e9f5;
+      padding: 14px 16px;
+      border-radius: 18px 18px 18px 4px;
+      font-size: 14px;
+      line-height: 1.7;
+      align-self: flex-start;
+      max-width: 92%;
+      border: 1px solid rgba(255,255,255,.06);
+    }
+    .ai-msg h2 {
+      font-size: 16px;
+      color: #00C2FF;
+      margin: 14px 0 8px;
+      font-weight: 700;
+    }
+    .ai-msg h2:first-child { margin-top: 0; }
+    .ai-msg strong { color: #fff; }
+    .ai-msg ul { padding-left: 18px; margin: 8px 0; }
+    .ai-msg li { margin-bottom: 6px; }
+  `;
+  document.head.appendChild(style);
+
+  chatButton.addEventListener("click", () => {
+    chatPanel.style.display = "flex";
+  });
+
+  document.getElementById("closeChatBtn").addEventListener("click", () => {
+    chatPanel.style.display = "none";
+  });
+
+  const sendMessage = async () => {
+    const input = document.getElementById("chatInput");
+    const message = input.value.trim();
+    if (!message) return;
+
+    const messagesDiv = document.getElementById("chatMessages");
+
+    const userBubble = document.createElement("div");
+    userBubble.className = "user-msg";
+    userBubble.textContent = message;
+    messagesDiv.appendChild(userBubble);
+
+    input.value = "";
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+    const loadingBubble = document.createElement("div");
+    loadingBubble.className = "ai-msg";
+    loadingBubble.textContent = "Menganalisa...";
+    messagesDiv.appendChild(loadingBubble);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+    let context = {
+      ihsg: ihsgData.value ? ihsgData.value.toLocaleString("id-ID") : "tidak tersedia",
+      ihsgPersen: ihsgData.changePercent !== null ? (ihsgData.changePercent >= 0 ? "+" : "") + ihsgData.changePercent.toFixed(2) + "%" : "tidak tersedia",
+      waktu: new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })
+    };
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, context })
+      });
+
+      const json = await res.json();
+      const reply = json.reply || "Maaf, terjadi kesalahan. Coba tanya lagi ya.";
+
+      loadingBubble.innerHTML = typeof marked !== "undefined" ? marked.parse(reply) : reply;
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+    } catch (err) {
+      console.error(err);
+      loadingBubble.textContent = "Gagal menghubungi AI. Coba lagi nanti.";
+    }
+  };
+
+  document.getElementById("chatSendBtn").addEventListener("click", sendMessage);
+  document.getElementById("chatInput").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") sendMessage();
+  });
 }
