@@ -16,19 +16,19 @@ function setupMobileMenu() {
 
   const openDrawer = () => {
     drawer.classList.add("open");
-    overlay.classList.add("open");
+    if (overlay) overlay.classList.add("open");
     document.body.style.overflow = "hidden";
   };
 
   const closeDrawer = () => {
     drawer.classList.remove("open");
-    overlay.classList.remove("open");
+    if (overlay) overlay.classList.remove("open");
     document.body.style.overflow = "";
   };
 
   toggle.addEventListener("click", openDrawer);
-  closeBtn?.addEventListener("click", closeDrawer);
-  overlay?.addEventListener("click", closeDrawer);
+  if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
+  if (overlay) overlay.addEventListener("click", closeDrawer);
 
   drawer.querySelectorAll("button[data-target]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -90,28 +90,36 @@ function setupPremium() {
 // ======================
 function updateChart(symbol) {
   const container = document.getElementById("tvchart");
-  if (!container || typeof TradingView === "undefined") return;
+  if (!container) return;
+  if (typeof TradingView === "undefined") {
+    console.warn("TradingView belum siap");
+    return;
+  }
 
   container.innerHTML = "";
   currentSymbol = symbol || "IDX:COMPOSITE";
 
-  new TradingView.widget({
-    container_id: "tvchart",
-    autosize: true,
-    symbol: currentSymbol,
-    interval: "D",
-    timezone: "Asia/Jakarta",
-    theme: "dark",
-    style: "1",
-    locale: "id",
-    toolbar_bg: "#0a0e1a",
-    enable_publishing: false,
-    hide_top_toolbar: false,
-    hide_legend: false,
-    save_image: false,
-    backgroundColor: "#0a0e1a",
-    gridColor: "rgba(255,255,255,0.05)",
-  });
+  try {
+    new TradingView.widget({
+      container_id: "tvchart",
+      autosize: true,
+      symbol: currentSymbol,
+      interval: "D",
+      timezone: "Asia/Jakarta",
+      theme: "dark",
+      style: "1",
+      locale: "id",
+      toolbar_bg: "#0a0e1a",
+      enable_publishing: false,
+      hide_top_toolbar: false,
+      hide_legend: false,
+      save_image: false,
+      backgroundColor: "#0a0e1a",
+      gridColor: "rgba(255,255,255,0.05)",
+    });
+  } catch (err) {
+    console.error("Chart error:", err);
+  }
 }
 
 // ======================
@@ -122,24 +130,25 @@ async function loadIHSG() {
     const res = await fetch("/api/saham?kode=COMPOSITE");
     const json = await res.json();
 
+    const el = document.getElementById("ihsg");
+    const persenEl = document.getElementById("ihsgPersen");
+
     if (!res.ok || !json.data) {
-      document.getElementById("ihsg").textContent = "Error";
+      if (el) el.textContent = "-";
       return;
     }
 
     const data = json.data;
-    const el = document.getElementById("ihsg");
-    const persenEl = document.getElementById("ihsgPersen");
-
-    if (el) el.textContent = data.close ? data.close.toLocaleString("id-ID") : "-";
+    if (el) el.textContent = data.close ? Number(data.close).toLocaleString("id-ID") : "-";
     if (persenEl) {
       const pct = data.changePercent || 0;
-      persenEl.textContent = (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
+      persenEl.textContent = (pct >= 0 ? "+" : "") + Number(pct).toFixed(2) + "%";
       persenEl.style.color = pct >= 0 ? "#00D26A" : "#FF4D5A";
     }
   } catch (err) {
     console.error("loadIHSG error:", err);
-    document.getElementById("ihsg").textContent = "Error";
+    const el = document.getElementById("ihsg");
+    if (el) el.textContent = "-";
   }
 }
 
@@ -151,18 +160,19 @@ async function loadMarketMovers() {
     const res = await fetch("/api/summary");
     const json = await res.json();
 
+    const gainersEl = document.getElementById("gainersList");
+    const losersEl = document.getElementById("losersList");
+    const topPickGrid = document.getElementById("topPickGrid");
+
     if (!res.ok || !json.data) {
-      document.getElementById("gainersList").innerHTML = "<li>Data tidak tersedia</li>";
-      document.getElementById("losersList").innerHTML = "<li>Data tidak tersedia</li>";
+      if (gainersEl) gainersEl.innerHTML = "<li>Data tidak tersedia</li>";
+      if (losersEl) losersEl.innerHTML = "<li>Data tidak tersedia</li>";
       return;
     }
 
     const list = json.data;
     const gainers = list.slice(0, 5);
     const losers = list.slice(-5).reverse();
-
-    const gainersEl = document.getElementById("gainersList");
-    const losersEl = document.getElementById("losersList");
 
     if (gainersEl) {
       gainersEl.innerHTML = gainers
@@ -188,8 +198,6 @@ async function loadMarketMovers() {
         .join("");
     }
 
-    // Top Pick sederhana
-    const topPickGrid = document.getElementById("topPickGrid");
     if (topPickGrid && gainers.length > 0) {
       topPickGrid.innerHTML = gainers
         .slice(0, 3)
@@ -242,7 +250,6 @@ async function analyzeStock() {
     const color = pct >= 0 ? "#00D26A" : "#FF4D5A";
     const sign = pct >= 0 ? "+" : "";
 
-    // Update chart
     updateChart("IDX:" + kode);
 
     card.innerHTML = `
@@ -251,7 +258,7 @@ async function analyzeStock() {
           <h2 style="font-size:26px;margin-bottom:4px">${d.kode}</h2>
           <p style="color:var(--text2);font-size:13px">${d.name || ""}</p>
         </div>
-        <span class="badge \( {pct >= 0 ? "buy" : "sell"}"> \){sign}${pct.toFixed(2)}%</span>
+        <span class="badge \( {pct >= 0 ? "buy" : "sell"}"> \){sign}${Number(pct).toFixed(2)}%</span>
       </div>
 
       <div class="price" style="color:\( {color}"> \){Number(d.close).toLocaleString("id-ID")}</div>
@@ -289,42 +296,58 @@ async function analyzeStock() {
 }
 
 // ======================
-// INIT
+// HIDE LOADING
 // ======================
-document.addEventListener("DOMContentLoaded", () => {
-  // Hide loading
+function hideLoading() {
   const loading = document.getElementById("loading");
   if (loading) {
+    loading.style.display = "none";
+  }
+}
+
+// ======================
+// START APP
+// ======================
+function startApp() {
+  try {
+    setupMobileMenu();
+    setupNavigation();
+    setupHeatmap();
+    setupPremium();
+
     setTimeout(() => {
-      loading.style.display = "none";
-    }, 700);
+      updateChart("IDX:COMPOSITE");
+    }, 600);
+
+    loadIHSG();
+    loadMarketMovers();
+
+    const btn = document.getElementById("analyzeButton");
+    if (btn) btn.addEventListener("click", analyzeStock);
+
+    const input = document.getElementById("stockInput");
+    if (input) {
+      input.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") analyzeStock();
+      });
+    }
+  } catch (err) {
+    console.error("StartApp error:", err);
+  } finally {
+    hideLoading();
   }
+}
 
-  setupMobileMenu();
-  setupNavigation();
-  setupHeatmap();
-  setupPremium();
+// ======================
+// INIT
+// ======================
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(startApp, 400);
+  });
+} else {
+  setTimeout(startApp, 400);
+}
 
-  // Chart
-  setTimeout(() => {
-    updateChart("IDX:COMPOSITE");
-  }, 500);
-
-  // Data
-  loadIHSG();
-  loadMarketMovers();
-
-  // Analisa button
-  const btn = document.getElementById("analyzeButton");
-  if (btn) {
-    btn.addEventListener("click", analyzeStock);
-  }
-
-  // Enter key
-  const input = document.getElementById("stockInput");
-  if (input) {
-    input.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") analyzeStock();
-    });
-  }
-});
+// Backup: paksa hilangkan loading setelah 3 detik
+setTimeout(hideLoading, 3000);
