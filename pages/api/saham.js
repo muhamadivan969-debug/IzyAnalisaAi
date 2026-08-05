@@ -20,8 +20,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Khusus IHSG
-    if (kode.toUpperCase() === "COMPOSITE" || kode.toUpperCase() === "IHSG") {
+    const searchKode = kode.toUpperCase();
+
+    // Jalur Khusus IHSG
+    if (searchKode === "COMPOSITE" || searchKode === "IHSG") {
       const indexRes = await fetch(`${PARSE_BASE}/get_market_index_summary`, {
         headers: { "X-API-Key": API_KEY },
       });
@@ -65,41 +67,31 @@ export default async function handler(req, res) {
       });
     }
 
-    // Cari saham biasa
-    let found = null;
+    // Jalur Saham Biasa - Mengambil 10 Halaman (1000 Saham) Secara Paralel
     const limit = 100;
-    let start = 0;
+    const pageOffsets = Array.from({ length: 10 }, (_, idx) => idx * limit);
 
-    for (let i = 0; i < 10; i++) {
+    const fetchPromises = pageOffsets.map(async (start) => {
       const url = `${PARSE_BASE}/get_stock_summary?start=${start}&limit=${limit}`;
       const response = await fetch(url, {
         headers: { "X-API-Key": API_KEY },
       });
+      if (!response.ok) return [];
       const json = await response.json();
+      return json?.data?.data || json?.data || json || [];
+    });
 
-      if (!response.ok) {
-        return res.status(response.status).json({
-          error: "Gagal mengambil data saham",
-          detail: json,
-        });
-      }
+    const results = await Promise.all(fetchPromises);
+    const allStocks = results.flat();
 
-      const list = json?.data?.data || json?.data || json || [];
-      if (!Array.isArray(list) || list.length === 0) break;
-
-      found = list.find(
-        (item) =>
-          (item.StockCode || item.stock_code || item.Code || item.code || "")
-            .toUpperCase() === kode.toUpperCase()
-      );
-
-      if (found) break;
-      start += limit;
-    }
+    const found = allStocks.find(
+      (item) =>
+        (item.StockCode || item.stock_code || item.Code || item.code || "").toUpperCase() === searchKode
+    );
 
     if (!found) {
       return res.status(404).json({
-        error: `Saham ${kode.toUpperCase()} tidak ditemukan`,
+        error: `Saham ${searchKode} tidak ditemukan`,
       });
     }
 
@@ -120,7 +112,7 @@ export default async function handler(req, res) {
         low,
         volume,
         changePercent,
-        kode: (found.StockCode || found.Code || kode).toUpperCase(),
+        kode: (found.StockCode || found.Code || searchKode).toUpperCase(),
         name: found.StockName || found.Name || found.name || "",
       },
     });
