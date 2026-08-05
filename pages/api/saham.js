@@ -3,27 +3,33 @@ const API_KEY = process.env.PARSEBOT_API_KEY;
 
 export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+  if (!API_KEY) return res.status(500).json({ error: "PARSEBOT_API_KEY belum dikonfigurasi" });
+
   const { kode } = req.query;
-  if (!kode) return res.status(400).json({ error: "Parameter 'kode' wajib" });
-  if (!API_KEY) return res.status(500).json({ error: "API Key belum diatur" });
+  if (!kode) return res.status(400).json({ error: "Parameter 'kode' wajib diisi" });
 
   try {
-    const target = kode.toUpperCase();
+    const searchCode = kode.toUpperCase();
 
-    // Khusus IHSG
-    if (target === "COMPOSITE" || target === "IHSG") {
-      const indexRes = await fetch(`${PARSE_BASE}/get_market_index_summary`, {
-        headers: { "X-API-Key": API_KEY },
+    // Khusus IHSG / COMPOSITE
+    if (searchCode === "COMPOSITE" || searchCode === "IHSG") {
+      const r = await fetch(`${PARSE_BASE}/get_market_index_summary`, {
+        headers: { "X-API-Key": API_KEY }
       });
-      const indexJson = await indexRes.json();
-      const list = indexJson?.data || indexJson || [];
-      const ihsg = list.find(i => (i.IndexCode || i.Code || "").toUpperCase() === "COMPOSITE");
+      const json = await r.json();
+      if (!r.ok) return res.status(r.status).json({ error: "Gagal mengambil data IHSG", detail: json });
 
-      if (!ihsg) return res.status(404).json({ error: "IHSG tidak ditemukan" });
+      const list = Array.isArray(json?.data) ? json.data : json?.data?.data || [];
+      const ihsg = list.find(i => 
+        (i.IndexCode || i.Code || "").toUpperCase() === "COMPOSITE" ||
+        (i.IndexName || "").toLowerCase().includes("composite")
+      );
+
+      if (!ihsg) return res.status(404).json({ error: "Data IHSG tidak ditemukan" });
 
       const close = Number(ihsg.LastVal || ihsg.Close || 0);
       const prev = Number(ihsg.PrevVal || close);
-      const changePercent = prev ? ((close - prev) / prev) * 100 : 0;
+      const changePercent = prev ? ((close - prev) / prev) * 100 : Number(ihsg.ChgPct || 0);
 
       return res.status(200).json({
         data: {
@@ -34,32 +40,32 @@ export default async function handler(req, res) {
           volume: 0,
           changePercent: Number(changePercent.toFixed(2)),
           kode: "COMPOSITE",
-          name: "IHSG",
+          name: "IHSG"
         }
       });
     }
 
-    // Tarik 10 halaman paralel agar pencarian tidak lag [1]
-    const pages = 10;
-    const limit = 100;
-    const fetchPromises = Array.from({ length: pages }, (_, i) => {
-      const url = `${PARSE_BASE}/get_stock_summary?start=${i * limit}&limit=${limit}`;
-      return fetch(url, { headers: { "X-API-Key": API_KEY } })
-        .then(r => r.ok ? r.json() : null)
-        .catch(() => null);
-    });
+    // Cari Saham Biasa secara Paralel (Menghindari Loop Lambat)
+    const fetchPromises = Array.from({ length: 10 }, (_, i) => 
+      fetch(`${PARSE_BASE}/get_stock_summary?start=${i * 100}&limit=100`, {
+        headers: { "X-API-Key": API_KEY }
+      }).then(r => r.ok ? r.json() : null).catch(() => null)
+    );
 
-    const results = await Promise.all(fetchPromises);
+    const rawResults = await Promise.all(fetchPromises);
     let found = null;
 
-    for (const json of results) {
-      if (!json) continue;
-      const list = json?.data?.data || json?.data || [];
-      found = list.find(item => (item.StockCode || item.Code || "").toUpperCase() === target);
-      if (found) break;
+    for (const json of rawResults) {
+      const list = json?.data?.data || json?.data || json || [];
+      if (Array.isArray(list)) {
+        found = list.find(item => 
+          (item.StockCode || item.Code || "").toUpperCase() === searchCode
+        );
+        if (found) break;
+      }
     }
 
-    if (!found) return res.status(404).json({ error: "Saham tidak ditemukan" });
+    if (!found) return res.status(404).json({ error: `Saham ${searchCode} tidak ditemukan` });
 
     const close = Number(found.Close || found.Last || 0);
     return res.status(200).json({
@@ -70,9 +76,12 @@ export default async function handler(req, res) {
         low: Number(found.Low || close),
         volume: Number(found.Volume || 0),
         changePercent: Number(found.ChangePercent || 0),
-        kode: target,
-        name: found.StockName || found.Name || "",
+        kode: searchCode,
+        name: found.StockName || found.Name || ""
       }
     });
+
   } catch (err) {
-    return res.status(500).json({ error: "InternalNo response
+    return res.status(500).json({ error: "Server error", message: err.message });
+  }
+}
