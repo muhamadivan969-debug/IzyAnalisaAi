@@ -49,9 +49,8 @@ export default function Home() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch IHSG & Top Picks
+  // Ambil data IHSG & Top Picks
   useEffect(() => {
-    // IHSG
     fetch("/api/saham?kode=COMPOSITE")
       .then(res => res.json())
       .then(json => {
@@ -61,7 +60,6 @@ export default function Home() {
       })
       .catch(() => setIhsgData(prev => ({ ...prev, loading: false })));
 
-    // Top Picks
     fetch("/api/summary")
       .then(res => res.json())
       .then(json => {
@@ -88,7 +86,6 @@ export default function Home() {
     }
   };
 
-  // Fetch Sector Stocks on Sheet Click
   const handleSectorClick = async (sectorName: string) => {
     setSelectedSector(sectorName);
     setSectorStocksLoading(true);
@@ -139,14 +136,14 @@ export default function Home() {
   );
 
   return (
-    <div className="bg-[#05070d] text-[#e5e9f5] min-height-screen pb-20 relative select-none">
+    <div className="bg-[#05070d] text-[#e5e9f5] min-h-screen pb-20 relative select-none">
       <Head>
         <title>IzyAnalisaAI</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
       </Head>
 
       {/* --- HEADER --- */}
-      <header className="sticky top-0 z-40 bg-[#05070d]/90 backdrop-blur-md border-b border-[#ffffff12] px-4 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-45 bg-[#05070d]/90 backdrop-blur-md border-b border-[#ffffff12] px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-1" onClick={() => { setSelectedStock(null); setSelectedSector(null); setActiveTab("home"); }}>
           <h1 className="text-xl font-extrabold tracking-tight cursor-pointer">
             <span className="text-[#00c2ff]">Izy</span>Analisa<span className="text-[#00c2ff]">AI</span>
@@ -162,7 +159,6 @@ export default function Home() {
             </div>
           </button>
 
-          {/* Profile Dropdown */}
           {showProfileDropdown && (
             <div ref={dropdownRef} className="absolute right-0 top-11 w-64 bg-[#0a0e1a] border border-[#ffffff12] rounded-xl shadow-2xl p-4 z-50 animate-fade">
               <div className="pb-3 border-b border-[#ffffff12]">
@@ -184,10 +180,9 @@ export default function Home() {
         </div>
       </header>
 
-      {/* --- MAIN PAGE CONTENT --- */}
+      {/* --- KONTEN UTAMA --- */}
       <main className="max-w-md mx-auto p-4 space-y-6">
 
-        {/* 1. HOMEPAGE TAB */}
         {activeTab === "home" && !selectedStock && (
           <div className="space-y-6 animate-fade">
             <div>
@@ -195,10 +190,9 @@ export default function Home() {
               <h2 className="text-2xl font-bold">Halo, Trader!</h2>
             </div>
 
-            {/* IHSG Box */}
             <div className="bg-[#0a0e1a] p-5 rounded-xl border border-[#ffffff12] space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400 font-medium">Indeks Harga Saham Gabungan (IHSG)</span>
+                <span className="text-sm text-gray-400 font-medium">IHSG</span>
                 <span className="text-xs bg-[#111a2e] px-2.5 py-1 rounded-full text-gray-300 font-mono">1D</span>
               </div>
               {ihsgData.loading ? (
@@ -213,7 +207,6 @@ export default function Home() {
               )}
             </div>
 
-            {/* Fear & Greed & Win Rate */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-[#0a0e1a] p-4 rounded-xl border border-[#ffffff12] text-center">
                 <p className="text-xs text-gray-400 font-medium">Fear & Greed Index</p>
@@ -227,7 +220,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Top Pick AI */}
             <div className="space-y-4">
               <h3 className="text-lg font-bold tracking-tight">🔥 Top Pick AI</h3>
               <div className="space-y-3">
@@ -252,12 +244,11 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Heatmap Sektor */}
             <div className="space-y-4">
               <h3 className="text-lg font-bold tracking-tight">🌡️ Heatmap Sektor</h3>
               <p className="text-xs text-gray-400 -mt-2">Ketuk sektor untuk menampilkan list 950+ saham BEI secara dinamis.</p>
               <div className="grid grid-cols-2 gap-3">
-                {Object.keys(SECTOR_MAPPING).map(sector => (
+                {["Perbankan", "Energi", "Tambang", "Teknologi", "Healthcare", "Property", "Consumer", "Transportasi"].map(sector => (
                   <div key={sector} onClick={() => handleSectorClick(sector)} className="bg-[#0a0e1a] p-4 rounded-xl border border-[#ffffff12] text-center cursor-pointer hover:border-[#00c2ff]/50 transition-colors">
                     <h4 className="font-bold text-sm">{sector}</h4>
                     <span className="text-xs text-[#00d26a] font-semibold bg-[#00d26a]/10 px-2 py-0.5 rounded-full inline-block mt-1">+1.42%</span>
@@ -268,7 +259,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* 2. ANALISA TAB */}
         {activeTab === "analisa" && !selectedStock && (
           <div className="space-y-6 animate-fade">
             <h2 className="text-xl font-bold">Cari & Scan Saham</h2>
@@ -298,7 +288,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* 3. STREAM TAB */}
         {activeTab === "stream" && !selectedStock && (
           <div className="space-y-6 animate-fade">
             <h2 className="text-xl font-bold">Diskusi Komunitas</h2>
@@ -309,7 +298,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* VIP Premium Promo */}
             <div className="bg-gradient-to-r from-[#00c2ff]/10 to-[#00e5a8]/10 p-5 rounded-xl border border-[#00c2ff]/25 space-y-3 text-center">
               <h3 className="font-bold text-base text-white">Grup VIP Premium Chat</h3>
               <p className="text-xs text-gray-400 max-w-xs mx-auto">Dapatkan sinyal harian eksklusif, analisis chart komprehensif, dan trading plan tanpa batas.</p>
@@ -318,7 +306,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* 4. WATCHLIST TAB */}
         {activeTab === "watchlist" && !selectedStock && (
           <div className="space-y-6 animate-fade">
             <h2 className="text-xl font-bold">Watchlist Favorit Saya</h2>
@@ -341,7 +328,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* 5. PROFIL TAB */}
         {activeTab === "profil" && !selectedStock && (
           <div className="space-y-6 animate-fade">
             <div className="bg-[#0a0e1a] p-5 rounded-xl border border-[#ffffff12] flex items-center space-x-4">
@@ -360,7 +346,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* --- DETAIL SAHAM SCREEN --- */}
+        {/* --- MODAL DETAIL SAHAM --- */}
         {selectedStock && (
           <div className="space-y-6 animate-fade">
             <button onClick={() => setSelectedStock(null)} className="flex items-center space-x-2 text-gray-400 text-sm hover:text-white mb-2">
@@ -377,7 +363,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* AI Summary and Interactive Analysis Card */}
             <div className="bg-[#0a0e1a] p-5 rounded-xl border border-[#ffffff12] space-y-4">
               <h3 className="text-base font-bold text-[#00c2ff] flex items-center">⭐ Hasil Analisis AI Pintar</h3>
               <div className="grid grid-cols-2 gap-4 text-center">
@@ -397,7 +382,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Tanya AI (Gemini Chat Integration) */}
             <div className="bg-[#0a0e1a] p-5 rounded-xl border border-[#ffffff12] space-y-3">
               <h3 className="text-sm font-bold text-white">Tanya AI asisten IzyAnalisaAI</h3>
               <p className="text-xs text-gray-400">Tanyakan tentang proyeksi, tren, atau target harga saham {selectedStock.kode}.</p>
@@ -423,7 +407,6 @@ export default function Home() {
         <>
           <div onClick={() => setSelectedSector(null)} className="fixed inset-0 bg-black/60 z-40 transition-opacity" />
           <div className="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-[#0a0e1a] border-t border-[#ffffff12] rounded-t-[22px] p-6 z-50 animate-slide-up max-h-[70vh] overflow-y-auto">
-            {/* Handle Drag bar */}
             <div className="w-12 h-1.5 bg-gray-700 rounded-full mx-auto mb-4 cursor-pointer" onClick={() => setSelectedSector(null)} />
             
             <div className="flex justify-between items-center mb-4">
@@ -461,14 +444,13 @@ export default function Home() {
         </>
       )}
 
-      {/* --- TOAST POP-UP --- */}
       {toastMessage && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#00c2ff] text-[#05070d] text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl z-50 animate-fade">
           {toastMessage}
         </div>
       )}
 
-      {/* --- STICKY BOTTOM NAV --- */}
+      {/* --- NAVIGASI BAWAH (STICKY BOTTOM NAV) --- */}
       <nav className="fixed bottom-0 inset-x-0 bg-[#05070d]/90 backdrop-blur-md border-t border-[#ffffff12] max-w-md mx-auto z-40 flex justify-around py-3">
         {(["home", "analisa", "stream", "watchlist", "profil"] as const).map(tab => (
           <button key={tab} onClick={() => { setSelectedStock(null); setActiveTab(tab); }} className={`flex flex-col items-center space-y-1 text-[10px] font-bold transition-all ${activeTab === tab ? "text-[#00c2ff]" : "text-gray-500"}`}>
