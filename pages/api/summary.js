@@ -1,6 +1,3 @@
-// pages/api/summary.js
-// Top Gainers / Losers menggunakan Parse.bot
-
 const PARSE_BASE = "https://api.parse.bot/scraper/3344e652-0a91-4a3c-96f6-d64b4d7f7369";
 const API_KEY = process.env.PARSE_API_KEY;
 
@@ -14,7 +11,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Ambil data saham (ambil 2-3 halaman biar cukup banyak)
     let allStocks = [];
     const limit = 100;
 
@@ -23,7 +19,6 @@ export default async function handler(req, res) {
       const response = await fetch(url, {
         headers: { "X-API-Key": API_KEY },
       });
-
       const json = await response.json();
       if (!response.ok) break;
 
@@ -33,17 +28,11 @@ export default async function handler(req, res) {
       allStocks = allStocks.concat(list);
     }
 
-    // Mapping ke format yang dipakai frontend
     const mapped = allStocks
       .map((item) => {
         const kode = (item.StockCode || item.Code || item.code || "").toUpperCase();
         const changePercent = Number(
-          item.ChangePercent ||
-            item.change_percent ||
-            item.Change ||
-            item.Pct ||
-            item.pct ||
-            0
+          item.ChangePercent || item.change_percent || item.Change || item.Pct || item.pct || 0
         );
         const close = Number(item.Close || item.close || item.Last || 0);
         const name = item.StockName || item.Name || item.name || "";
@@ -52,11 +41,10 @@ export default async function handler(req, res) {
       })
       .filter((item) => item.kode && !isNaN(item.changePercent));
 
-    // Sort untuk Top Gainers & Losers
     const sorted = [...mapped].sort((a, b) => b.changePercent - a.changePercent);
 
     return res.status(200).json({
-      data: sorted, // frontend akan slice sendiri untuk gainers & losers
+      data: sorted,
     });
   } catch (err) {
     console.error("Parse.bot summary error:", err);
