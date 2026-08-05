@@ -1,57 +1,68 @@
-// =========================
-// API SUMMARY (Top Gainers/Losers, real-time via GoAPI)
-// =========================
-// Menggantikan versi sebelumnya yang membaca dari data/summary.csv
-// (file yang perlu di-generate lewat script generate-summary.py
-// yang tidak ditemukan di project). Endpoint ini kembali memakai
-// data real-time dari GoAPI untuk daftar saham likuid papan utama.
+// pages/api/summary.js
+// Top Gainers / Losers menggunakan Parse.bot
+
+const PARSE_BASE = "https://api.parse.bot/scraper/3344e652-0a91-4a3c-96f6-d64b4d7f7369";
+const API_KEY = process.env.PARSE_API_KEY;
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const apiKey = process.env.GOAPI_KEY;
-  const BASE = "https://api.goapi.io/stock/idx";
-  const headers = { "X-API-KEY": apiKey, "Accept": "application/json" };
-
-  // Saham blue-chip likuid papan utama, dipakai sebagai basis
-  // Top Gainers/Losers dan Top Pick AI di homepage.
-  const daftarSaham = [
-    "BBRI", "BMRI", "BBCA", "BBNI", "TLKM",
-    "ASII", "UNVR", "GOTO", "ANTM", "ADRO",
-    "BRIS", "ICBP", "INDF", "KLBF", "PGAS",
-    "PTBA", "SMGR", "UNTR", "EXCL", "MDKA"
-  ];
-
-  const normalize = (r) => ({
-    kode: r.symbol || r.ticker || "",
-    close: Number(r.close || r.last_price || 0),
-    open: Number(r.open || 0),
-    high: Number(r.high || 0),
-    low: Number(r.low || 0),
-    volume: Number(r.volume || 0),
-    changePercent: Number(r.change_pct || r.percent || 0)
-  });
+  if (!API_KEY) {
+    return res.status(500).json({ error: "PARSE_API_KEY belum dikonfigurasi" });
+  }
 
   try {
-    const r = await fetch(`${BASE}/prices?symbols=${daftarSaham.join(",")}`, { headers });
-    const j = await r.json();
-    const results = j.data?.results || [];
+    // Ambil data saham (ambil 2-3 halaman biar cukup banyak)
+    let allStocks = [];
+    const limit = 100;
 
-    const validData = results.map(normalize).filter(item => item.close > 0);
+    for (let start = 0; start < 300; start += limit) {
+      const url = `\( {PARSE_BASE}/get_stock_summary?start= \){start}&limit=${limit}`;
+      const response = await fetch(url, {
+        headers: { "X-API-Key": API_KEY },
+      });
 
-    // Hitung ulang changePercent kalau API tidak menyediakannya langsung
-    validData.forEach(item => {
-      if (item.changePercent === 0 && item.open > 0) {
-        item.changePercent = ((item.close - item.open) / item.open) * 100;
-      }
+      const json = await response.json();
+      if (!response.ok) break;
+
+      const list = json?.data?.data || json?.data || json || [];
+      if (!Array.isArray(list) || list.length === 0) break;
+
+      allStocks = allStocks.concat(list);
+    }
+
+    // Mapping ke format yang dipakai frontend
+    const mapped = allStocks
+      .map((item) => {
+        const kode = (item.StockCode || item.Code || item.code || "").toUpperCase();
+        const changePercent = Number(
+          item.ChangePercent ||
+            item.change_percent ||
+            item.Change ||
+            item.Pct ||
+            item.pct ||
+            0
+        );
+        const close = Number(item.Close || item.close || item.Last || 0);
+        const name = item.StockName || item.Name || item.name || "";
+
+        return { kode, name, changePercent, close };
+      })
+      .filter((item) => item.kode && !isNaN(item.changePercent));
+
+    // Sort untuk Top Gainers & Losers
+    const sorted = [...mapped].sort((a, b) => b.changePercent - a.changePercent);
+
+    return res.status(200).json({
+      data: sorted, // frontend akan slice sendiri untuk gainers & losers
     });
-
-    return res.status(200).json({ data: validData });
-
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Server error", detail: err.message });
+    console.error("Parse.bot summary error:", err);
+    return res.status(500).json({
+      error: "Gagal mengambil data summary",
+      message: err.message,
+    });
   }
 }
