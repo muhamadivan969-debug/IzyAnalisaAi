@@ -1,9 +1,4 @@
-// pages/_app_deprecated.js
-// This file is a backup of the previous pages/_app.js to avoid duplicate Next.js App definitions.
-// It's safe to delete this file later once you're sure pages/_app.tsx is the active App component.
+// This file is deprecated and kept as a backup. It should not be imported by the app.
+// If you want to restore the previous JS-based _app, copy contents from here to pages/_app.js.
 
-import "@/app/globals.css";
-
-export default function App({ Component, pageProps }) {
-  return <Component {...pageProps} />;
-}
+// Deprecated file - intentionally blank to avoid conflicts.
