@@ -5,7 +5,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const kode = searchParams.get('kode');
 
-    // Panggil Yahoo Finance API
+    // Fungsi ambil data dari Yahoo Finance
     const fetchStock = async (symbol: string) => {
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`;
       const res = await fetch(url);
@@ -27,25 +27,20 @@ export async function GET(request: Request) {
       return null;
     };
 
+    // Kalo ada parameter kode, ambil saham spesifik
     if (kode) {
-      // Tambahkan .JK untuk saham Indonesia
       const symbol = kode.toUpperCase().includes('.JK') ? kode.toUpperCase() : `${kode.toUpperCase()}.JK`;
       const stock = await fetchStock(symbol);
       
       if (stock) {
-        return NextResponse.json({
-          success: true,
-          data: stock,
-        });
+        return NextResponse.json({ success: true, data: stock });
       }
+      return NextResponse.json({ success: false, error: 'Saham tidak ditemukan' }, { status: 404 });
     }
 
-    // Kalo gak ada kode, ambil IHSG
+    // Default: ambil IHSG
     const ihsg = await fetchStock('^JKSE');
-    return NextResponse.json({
-      success: true,
-      data: ihsg,
-    });
+    return NextResponse.json({ success: true, data: ihsg });
 
   } catch (error) {
     console.error('Error:', error);
