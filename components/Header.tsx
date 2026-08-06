@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import { Bell, User, Crown } from "lucide-react";
 import { useToast } from "./Toast";
+import { useRouter } from "next/router";
 
 export default function Header() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -19,7 +21,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 bg-[#05070d]/90 backdrop-blur-md border-b border-[#ffffff12] px-4 py-3 flex items-center justify-between">
-      <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { window.location.href = "/"; }}>
+      <div className="flex items-center space-x-3 cursor-pointer" onClick={() => router.push('/')}>
         <h1 className="text-lg font-extrabold tracking-tight">
           <span className="text-[#00c2ff]">Izy</span>Analisa<span className="text-[#00c2ff]">AI</span>
         </h1>
