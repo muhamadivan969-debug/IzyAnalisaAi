@@ -5,10 +5,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const kode = searchParams.get('kode');
 
-    // Panggil API eksternal untuk data saham real-time
-    // Menggunakan Yahoo Finance sebagai sumber data
+    // Panggil Yahoo Finance API
     const fetchStock = async (symbol: string) => {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}.JK`;
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`;
       const res = await fetch(url);
       const data = await res.json();
       
@@ -18,7 +17,7 @@ export async function GET(request: Request) {
         const lastIndex = quote.close.length - 1;
         
         return {
-          kode: symbol,
+          kode: symbol.replace('.JK', ''),
           name: meta.symbol || symbol,
           close: quote.close[lastIndex] || 0,
           changePercent: ((quote.close[lastIndex] - quote.open[0]) / quote.open[0]) * 100 || 0,
@@ -29,21 +28,19 @@ export async function GET(request: Request) {
     };
 
     if (kode) {
-      const stock = await fetchStock(kode.toUpperCase());
+      // Tambahkan .JK untuk saham Indonesia
+      const symbol = kode.toUpperCase().includes('.JK') ? kode.toUpperCase() : `${kode.toUpperCase()}.JK`;
+      const stock = await fetchStock(symbol);
+      
       if (stock) {
         return NextResponse.json({
           success: true,
           data: stock,
         });
-      } else {
-        return NextResponse.json(
-          { success: false, error: 'Saham tidak ditemukan' },
-          { status: 404 }
-        );
       }
     }
 
-    // Kalo gak ada parameter, ambil data IHSG
+    // Kalo gak ada kode, ambil IHSG
     const ihsg = await fetchStock('^JKSE');
     return NextResponse.json({
       success: true,
@@ -51,9 +48,9 @@ export async function GET(request: Request) {
     });
 
   } catch (error) {
-    console.error('Error fetching stock data:', error);
+    console.error('Error:', error);
     return NextResponse.json(
-      { success: false, error: 'Gagal mengambil data saham' },
+      { success: false, error: 'Gagal ambil data' },
       { status: 500 }
     );
   }
