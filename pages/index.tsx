@@ -78,7 +78,13 @@ export default function Home() {
                 <div className="h-[360px]">
                   <List height={360} itemCount={topPicks.length} itemSize={76} width={'100%'}>
                     {({index, style}) => (
-                      <div style={style} className="p-1"><StockRow stock={{ kode: topPicks[index].kode||topPicks[index].symbol, name: topPicks[index].name, close: topPicks[index].close||0, changePercent: topPicks[index].changePercent||0, spark: topPicks[index].spark }} onClick={() => router.push(`/stock/${(topPicks[index].kode||topPicks[index].symbol)}`)} onToggle={() => alert('toggle watchlist')} /></div>
+                      <div style={style} className="p-1">
+                        <StockRow
+                          stock={{ kode: topPicks[index].kode||topPicks[index].symbol, name: topPicks[index].name, close: topPicks[index].close||0, changePercent: topPicks[index].changePercent||0, spark: topPicks[index].spark }}
+                          onClick={() => router.push(`/stock/${(topPicks[index].kode||topPicks[index].symbol)}`)}
+                          onToggle={() => alert('toggle watchlist')}
+                        />
+                      </div>
                     )}
                   </List>
                 </div>
