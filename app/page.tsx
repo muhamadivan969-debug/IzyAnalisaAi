@@ -1,6 +1,8 @@
+'use client'
+
 import Head from "next/head";
 import { useEffect, useState } from "react";
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import Card from "@/components/Card";
 import Skeleton from "@/components/Skeleton";
 import StockRow from "@/components/StockRow";
@@ -41,7 +43,7 @@ export default function Home() {
               ) : (
                 <div className="flex items-baseline space-x-3">
                   <span className="text-3xl font-extrabold tracking-tight">{Number(ihsg.close).toLocaleString()}</span>
-                  <span className={`text-sm font-semibold px-2.5 py-0.5 rounded-full ${ihsg.changePercent >= 0 ? "bg-[#00d26a]/15 text-[#00d26a]" : "bg-[#ff4d5a]/15 text-[#ff4d5a]"}`}>{ihsg.changePercent >= 0 ? `+${ihsg.changePercent}%` : `${ihsg.changePercent}%`}</span>
+                  <span className={`text-sm font-semibold px-2.5 py-0.5 rounded-full ${ihsg.changePercent >= 0 ? "bg-[#00d26a]/15 text-[#00d26a]" : "bg-[#ff4d5a]/15 text-[#ff4d5a]"}`}>{ihsg.changePercent}%</span>
                 </div>
               )}
             </div>

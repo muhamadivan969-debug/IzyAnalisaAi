@@ -1,6 +1,8 @@
+'use client'
+
 import Card from '@/components/Card';
 import { useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import StockRow from '@/components/StockRow';
 import Skeleton from '@/components/Skeleton';
 

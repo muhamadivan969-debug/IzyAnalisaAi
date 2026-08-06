@@ -1,8 +1,10 @@
+'use client'
+
 import StockRow from '@/components/StockRow';
 import { useEffect, useState } from 'react';
 import Card from '@/components/Card';
 import { FixedSizeList as List } from 'react-window';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 
 export default function Watchlist() {
   const router = useRouter();
