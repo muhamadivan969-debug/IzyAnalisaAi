@@ -1,7 +1,1 @@
-{
-  "mcpServers": {
-    "parse": {
-      "url": "https://api.parse.bot/mcp"
-    }
-  }
-}
+{}
