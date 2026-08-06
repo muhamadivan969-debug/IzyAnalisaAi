@@ -1,5 +1,6 @@
 import Head from "next/head";
 import { useEffect, useState } from "react";
+import { useRouter } from 'next/router';
 import Card from "@/components/Card";
 import Skeleton from "@/components/Skeleton";
 import StockRow from "@/components/StockRow";
@@ -8,6 +9,7 @@ import SectorBottomSheet from "@/components/SectorBottomSheet";
 import { FixedSizeList as List } from 'react-window';
 
 export default function Home() {
+  const router = useRouter();
   const [ihsg, setIhsg] = useState<any>({ loading: true, close: 0, changePercent: 0 });
   const [topPicks, setTopPicks] = useState<any[]>([]);
   const [topLoading, setTopLoading] = useState(true);
@@ -39,7 +41,7 @@ export default function Home() {
               ) : (
                 <div className="flex items-baseline space-x-3">
                   <span className="text-3xl font-extrabold tracking-tight">{Number(ihsg.close).toLocaleString()}</span>
-                  <span className={`text-sm font-semibold px-2.5 py-0.5 rounded-full ${ihsg.changePercent >= 0 ? "bg-[#00d26a]/15 text-[#00d26a]" : "bg-[#ff4d5a]/15 text-[#ff4d5a]"}`}>{ihsg.changePercent >= 0 ? '+' : ''}{Number(ihsg.changePercent).toFixed(2)}%</span>
+                  <span className={`text-sm font-semibold px-2.5 py-0.5 rounded-full ${ihsg.changePercent >= 0 ? "bg-[#00d26a]/15 text-[#00d26a]" : "bg-[#ff4d5a]/15 text-[#ff4d5a]"}`}>{ihsg.changePercent >= 0 ? `+${ihsg.changePercent}%` : `${ihsg.changePercent}%`}</span>
                 </div>
               )}
             </div>
@@ -76,13 +78,13 @@ export default function Home() {
                 <div className="h-[360px]">
                   <List height={360} itemCount={topPicks.length} itemSize={76} width={'100%'}>
                     {({index, style}) => (
-                      <div style={style} className="p-1"><StockRow stock={{ kode: topPicks[index].kode||topPicks[index].symbol, name: topPicks[index].name, close: topPicks[index].close||0, changePercent: topPicks[index].changePercent||0, spark: topPicks[index].spark }} onClick={() => window.location.href = `/stock/${(topPicks[index].kode||topPicks[index].symbol)}`} onToggle={() => alert('toggle watchlist')} /></div>
+                      <div style={style} className="p-1"><StockRow stock={{ kode: topPicks[index].kode||topPicks[index].symbol, name: topPicks[index].name, close: topPicks[index].close||0, changePercent: topPicks[index].changePercent||0, spark: topPicks[index].spark }} onClick={() => router.push(`/stock/${(topPicks[index].kode||topPicks[index].symbol)}`)} onToggle={() => alert('toggle watchlist')} /></div>
                     )}
                   </List>
                 </div>
               ) : (
                 topPicks.map((s:any)=> (
-                  <StockRow key={s.kode || s.symbol} stock={{ kode: s.kode||s.symbol, name: s.name, close: s.close||0, changePercent: s.changePercent||0, spark: s.spark }} onClick={() => window.location.href = `/stock/${(s.kode||s.symbol)}`} onToggle={() => alert('toggle watchlist')} />
+                  <StockRow key={s.kode || s.symbol} stock={{ kode: s.kode||s.symbol, name: s.name, close: s.close||0, changePercent: s.changePercent||0, spark: s.spark }} onClick={() => router.push(`/stock/${(s.kode||s.symbol)}`)} onToggle={() => alert('toggle watchlist')} />
                 ))
               )
             )}
