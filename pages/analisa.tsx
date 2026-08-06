@@ -1,9 +1,11 @@
 import Card from '@/components/Card';
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 import StockRow from '@/components/StockRow';
 import Skeleton from '@/components/Skeleton';
 
 export default function Analisa() {
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'ALL'|'BULLISH'|'BEARISH'>('ALL');
   const [results, setResults] = useState<any[]>([]);
@@ -13,7 +15,7 @@ export default function Analisa() {
     if (!query) return;
     setLoading(true);
     // For now fake search: go to stock detail
-    window.location.href = `/stock/${query}`;
+    router.push(`/stock/${query}`);
   }
 
   return (
