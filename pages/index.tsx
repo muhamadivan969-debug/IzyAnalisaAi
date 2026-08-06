@@ -16,15 +16,56 @@ export default function Home() {
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/saham?kode=COMPOSITE')
-      .then(r => r.json())
-      .then(j => {
-        if (j?.data) setIhsg({ loading:false, close:j.data.close, changePercent:j.data.changePercent });
-        else setIhsg(p=>({ ...p, loading:false }));
-      })
-      .catch(()=> setIhsg(p=>({ ...p, loading:false })));
+    const controller = new AbortController();
+    const signal = controller.signal;
 
-    fetch('/api/summary').then(r=>r.json()).then(j=>{ setTopPicks(j?.data || []); setTopLoading(false); }).catch(()=>setTopLoading(false));
+    const timeoutMs = 10000; // 10s timeout
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    async function fetchIhsg() {
+      try {
+        const res = await fetch('/api/saham?kode=COMPOSITE', { signal });
+        if (!res.ok) {
+          console.error('Fetch IHSG failed status', res.status);
+          setIhsg(p => ({ ...p, loading: false }));
+          return;
+        }
+
+        const j = await res.json();
+        if (j?.data) {
+          setIhsg({ loading: false, close: j.data.close, changePercent: j.data.changePercent });
+        } else {
+          setIhsg(p => ({ ...p, loading: false }));
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          // request was aborted (timeout or unmount) — ignore
+          return;
+        }
+        console.error('Fetch IHSG error', err);
+        setIhsg(p => ({ ...p, loading: false }));
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    fetchIhsg();
+
+    // fetch summary (top picks)
+    const summaryController = new AbortController();
+    fetch('/api/summary', { signal: summaryController.signal })
+      .then(r => {
+        if (!r.ok) throw new Error('Summary fetch failed ' + r.status);
+        return r.json();
+      })
+      .then(j => { setTopPicks(j?.data || []); setTopLoading(false); })
+      .catch((e) => { console.error('Fetch summary error', e); setTopLoading(false); });
+
+    return () => {
+      controller.abort();
+      summaryController.abort();
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   return (
