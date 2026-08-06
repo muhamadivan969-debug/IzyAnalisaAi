@@ -1,6 +1,12 @@
 "use client";
 
-import ReactECharts from 'echarts-for-react';
+import dynamic from 'next/dynamic';
+import React from 'react';
+
+const ReactECharts = dynamic(() => import('echarts-for-react'), {
+  ssr: false,
+  loading: () => <div className="h-60 bg-[#071028] rounded-lg animate-pulse" />,
+});
 
 function sma(values: number[], period = 20) {
   const res: (number | null)[] = [];
@@ -18,45 +24,27 @@ function sma(values: number[], period = 20) {
 
 function rsi(values: number[], period = 14) {
   const res: (number | null)[] = [];
-  let gains = 0;
-  let losses = 0;
   for (let i = 0; i < values.length; i++) {
     if (i === 0) {
       res.push(null);
       continue;
     }
-    const change = values[i] - values[i - 1];
-    const gain = Math.max(0, change);
-    const loss = Math.max(0, -change);
-    if (i <= period) {
-      gains += gain;
-      losses += loss;
-      if (i < period) {
-        res.push(null);
-        continue;
-      }
-      const avgGain = gains / period;
-      const avgLoss = losses / period;
-      const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-      res.push(100 - 100 / (1 + rs));
-    } else {
-      // Wilder smoothing
-      const prevAvgGain = res[i - 1] == null ? gains / period : 0; // not used
-      // compute smoothed averages differently: we keep running sums
-      // simpler approach: compute average over last period (less efficient)
-      const slice = values.slice(i - period + 1, i + 1);
-      let g = 0,
-        l = 0;
-      for (let v = 1; v < slice.length; v++) {
-        const ch = slice[v] - slice[v - 1];
-        if (ch > 0) g += ch;
-        else l += -ch;
-      }
-      const avgG = g / period;
-      const avgL = l / period;
-      const rs = avgL === 0 ? 100 : avgG / avgL;
-      res.push(100 - 100 / (1 + rs));
+    if (i < period) {
+      res.push(null);
+      continue;
     }
+    const slice = values.slice(i - period + 1, i + 1);
+    let g = 0,
+      l = 0;
+    for (let v = 1; v < slice.length; v++) {
+      const ch = slice[v] - slice[v - 1];
+      if (ch > 0) g += ch;
+      else l += -ch;
+    }
+    const avgG = g / period;
+    const avgL = l / period;
+    const rs = avgL === 0 ? 100 : avgG / avgL;
+    res.push(100 - 100 / (1 + rs));
   }
   return res;
 }
@@ -86,14 +74,35 @@ function atr(data: Array<{ high: number; low: number; close: number }>, period =
   return res;
 }
 
-export default function CandlestickChart({ data = [] }: { data?: Array<{ time: string; open: number; high: number; low: number; close: number }> }) {
+export default function CandlestickChart({ data = [], showSMA = true, showRSI = true, showATR = true }: { data?: Array<{ time: string; open: number; high: number; low: number; close: number }>; showSMA?: boolean; showRSI?: boolean; showATR?: boolean }) {
   const times = data.map((d) => d.time);
   const ohlc = data.map((d) => [d.open, d.close, d.low, d.high]);
   const closes = data.map((d) => d.close);
 
-  const sma20 = sma(closes, 20).map((v) => (v == null ? '-' : Number(v.toFixed(2))));
-  const rsi14 = rsi(closes, 14).map((v) => (v == null ? '-' : Number(v.toFixed(2))));
-  const atr14 = atr(data, 14).map((v) => (v == null ? '-' : Number((v || 0).toFixed(2))));
+  const sma20 = sma(closes, 20).map((v) => (v == null ? '-' : Number((v as number).toFixed(2))));
+  const rsi14 = rsi(closes, 14).map((v) => (v == null ? '-' : Number((v as number).toFixed(2))));
+  const atr14 = atr(data, 14).map((v) => (v == null ? '-' : Number(((v as number) || 0).toFixed(2))));
+
+  const series: any[] = [
+    {
+      name: 'Candlestick',
+      type: 'candlestick',
+      data: ohlc,
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      itemStyle: { color: '#00d26a', color0: '#ff4d5a', borderColor: '#00d26a', borderColor0: '#ff4d5a' }
+    }
+  ];
+
+  if (showSMA) {
+    series.push({ name: 'SMA 20', type: 'line', data: sma20, xAxisIndex: 0, yAxisIndex: 0, showSymbol: false, lineStyle: { color: '#00c2ff', width: 1.5 } });
+  }
+  if (showRSI) {
+    series.push({ name: 'RSI 14', type: 'line', data: rsi14, xAxisIndex: 1, yAxisIndex: 1, showSymbol: false, lineStyle: { color: '#ffd166', width: 1.2 } });
+  }
+  if (showATR) {
+    series.push({ name: 'ATR 14', type: 'line', data: atr14, xAxisIndex: 2, yAxisIndex: 2, showSymbol: false, lineStyle: { color: '#9ad66e', width: 1.2 } });
+  }
 
   const option: any = {
     backgroundColor: 'transparent',
@@ -128,43 +137,7 @@ export default function CandlestickChart({ data = [] }: { data?: Array<{ time: s
       { type: 'inside', xAxisIndex: [0, 1, 2], start: 50, end: 100 },
       { show: true, xAxisIndex: [0, 1, 2], type: 'slider', top: '95%', start: 50, end: 100, fillerColor: 'rgba(0,194,255,0.12)', handleIcon: 'M8.2,13.8L8.2,13.8C8.6,13.9,9,14,9.4,14h0c0.4,0,0.8-0.1,1.2-0.2' }
     ],
-    series: [
-      {
-        name: 'Candlestick',
-        type: 'candlestick',
-        data: ohlc,
-        xAxisIndex: 0,
-        yAxisIndex: 0,
-        itemStyle: { color: '#00d26a', color0: '#ff4d5a', borderColor: '#00d26a', borderColor0: '#ff4d5a' }
-      },
-      {
-        name: 'SMA 20',
-        type: 'line',
-        data: sma20,
-        xAxisIndex: 0,
-        yAxisIndex: 0,
-        showSymbol: false,
-        lineStyle: { color: '#00c2ff', width: 1.5 }
-      },
-      {
-        name: 'RSI 14',
-        type: 'line',
-        data: rsi14,
-        xAxisIndex: 1,
-        yAxisIndex: 1,
-        showSymbol: false,
-        lineStyle: { color: '#ffd166', width: 1.2 }
-      },
-      {
-        name: 'ATR 14',
-        type: 'line',
-        data: atr14,
-        xAxisIndex: 2,
-        yAxisIndex: 2,
-        showSymbol: false,
-        lineStyle: { color: '#9ad66e', width: 1.2 }
-      }
-    ]
+    series
   };
 
   return (

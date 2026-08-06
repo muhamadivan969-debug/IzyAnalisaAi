@@ -4,7 +4,24 @@ import Card from '@/components/Card';
 import { FixedSizeList as List } from 'react-window';
 
 export default function Watchlist() {
-  const [list, setList] = useState<string[]>(['BBCA','BBRI','TLKM','ASII','UNVR','BMRI','SMGR','ANTM','ADRO','INDF','PGAS','MEDC']);
+  const [list, setList] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const cur = JSON.parse(localStorage.getItem('watchlist') || '[]');
+      setList(cur);
+    } catch (e) { setList([]); }
+  }, []);
+
+  useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key === 'watchlist') {
+        try { setList(JSON.parse(e.newValue || '[]')); } catch (err) { }
+      }
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const Row = ({ index, style }: any) => {
     const code = list[index];
@@ -15,7 +32,11 @@ export default function Watchlist() {
             <h4 className="font-bold text-white text-base">{code}</h4>
           </div>
           <div className="flex items-center space-x-2">
-            <button onClick={() => setList(l => l.filter(x => x !== code))} className="text-[#00c2ff]">Hapus</button>
+            <button onClick={() => {
+              const next = list.filter(x => x !== code);
+              localStorage.setItem('watchlist', JSON.stringify(next));
+              setList(next);
+            }} className="text-[#00c2ff]">Hapus</button>
             <button onClick={() => window.location.href = `/stock/${code}`} className="text-gray-300">Buka</button>
           </div>
         </div>
