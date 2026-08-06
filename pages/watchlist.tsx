@@ -2,8 +2,10 @@ import StockRow from '@/components/StockRow';
 import { useEffect, useState } from 'react';
 import Card from '@/components/Card';
 import { FixedSizeList as List } from 'react-window';
+import { useRouter } from 'next/router';
 
 export default function Watchlist() {
+  const router = useRouter();
   const [list, setList] = useState<string[]>([]);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export default function Watchlist() {
               localStorage.setItem('watchlist', JSON.stringify(next));
               setList(next);
             }} className="text-[#00c2ff]">Hapus</button>
-            <button onClick={() => window.location.href = `/stock/${code}`} className="text-gray-300">Buka</button>
+            <button onClick={() => router.push(`/stock/${code}`)} className="text-gray-300">Buka</button>
           </div>
         </div>
       </div>
